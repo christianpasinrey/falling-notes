@@ -13,7 +13,10 @@ browser — no samples, no frameworks beyond three.js from a CDN, no build step.
 | --- | --- | --- |
 | morning | **Prelude in C, BWV 846** — J. S. Bach, 1722 | Mutopia Project engraving |
 | dusk | **Gymnopédie № 1** — Erik Satie, 1888 | Mutopia Project engraving, repeat unfolded |
+| mystery | **Gnossienne № 1** — Erik Satie, 1890 | Mutopia Project engraving |
 | letter | **Für Elise** — L. v. Beethoven, 1810 | Mutopia Project engraving |
+| rêverie | **Nocturne Op. 9 № 2** — F. Chopin, 1832 | Mutopia Project engraving |
+| night | **Moonlight Sonata · I** — L. v. Beethoven, 1801 | Mutopia Project engraving |
 | moonlight | **Clair de Lune** — Claude Debussy, 1905 | Mutopia Project engraving |
 | storm | **L'estate · Presto** — Antonio Vivaldi, 1725 | piano-roll arrangement made for this page |
 | dawn | **Aurora** — Claude, 2026 | an original piece: after the dusk and the storm, first light |
