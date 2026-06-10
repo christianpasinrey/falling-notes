@@ -23,6 +23,26 @@ browser — no samples, no frameworks beyond three.js from a CDN, no build step.
 
 Autoplay chains the pieces; prev / next / pause controls float at the top.
 
+## The whole Mutopia library
+
+Beyond the featured nine, **all 2124 pieces of the
+[Mutopia Project](https://www.mutopiaproject.org/)** are playable: a searchable
+explorer (title, composer, instrument, style) loads any engraving's MIDI on
+demand, parses it in the browser through its full tempo map, and voices each
+track by instrument family — percussive piano, plucked or bowed strings,
+winds, organ, voice. Every piece keeps its license metadata (Public Domain or
+Creative Commons, as published by Mutopia). This page is a homage to that
+project: decades of volunteer engraving, made visible.
+
+The instrument at the bottom of the scene changes with the music: keyboard
+pieces land on the 3D piano, plucked and bowed pieces on a great harp whose
+strings ring and vibrate, winds and voices on a flute lying across space whose
+tone holes light up under each note.
+
+- `tools/crawl_mutopia.mjs` — builds `assets/catalog.json` from the listing
+- `tools/download_midis.mjs` — mirrors the MIDI corpus into `assets/midi/`
+- `js/midi.js` + `js/catalog.js` — browser-side parsing and piece building
+
 ## How it works
 
 | File | Role |

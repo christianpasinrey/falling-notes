@@ -1,10 +1,15 @@
 import { PianoSynth } from './synth.js';
 import { Sequencer } from './sequencer.js';
 import { PIECES } from './pieces/index.js';
+import { loadCatalog, loadCatalogPiece } from './catalog.js';
 
 const overlay = document.getElementById('overlay');
 const piecesEl = document.getElementById('pieces');
 const captionTitle = document.getElementById('caption-title');
+const explorer = document.getElementById('explorer');
+const exSearch = document.getElementById('ex-search');
+const exList = document.getElementById('ex-list');
+const exCount = document.getElementById('ex-count');
 
 // Prefer the WebGL space journey; fall back to the 2D highway if WebGL or
 // the three.js CDN are unavailable.
@@ -22,9 +27,15 @@ try {
 let synth = null;
 let seq = null;
 let paused = false;
-let currentIndex = -1;
 
-// — build the piece cards —
+// A playlist is what prev/next/autoplay walk through: the featured nine, or
+// whatever slice of the Mutopia library the explorer currently shows.
+const featured = PIECES.map((p) => ({ label: p.title, load: async () => p }));
+let playlist = featured;
+let currentIndex = -1;
+let startToken = 0;
+
+// — featured cards —
 PIECES.forEach((piece, i) => {
   const card = document.createElement('button');
   card.className = 'card';
@@ -35,13 +46,28 @@ PIECES.forEach((piece, i) => {
     span.textContent = piece[field];
     card.appendChild(span);
   }
-  card.addEventListener('click', () => start(i));
+  card.addEventListener('click', () => {
+    playlist = featured;
+    start(i);
+  });
   piecesEl.appendChild(card);
 });
 
-function start(index) {
-  currentIndex = ((index % PIECES.length) + PIECES.length) % PIECES.length;
-  const piece = PIECES[currentIndex];
+async function start(index) {
+  const token = ++startToken;
+  currentIndex = ((index % playlist.length) + playlist.length) % playlist.length;
+  const item = playlist[currentIndex];
+
+  let piece;
+  try {
+    captionTitle.textContent = `loading — ${item.label}…`;
+    piece = await item.load();
+  } catch (err) {
+    console.error('could not load piece:', err);
+    captionTitle.textContent = `could not load ${item.label}`;
+    return;
+  }
+  if (token !== startToken) return; // a newer start superseded this one
 
   // A fresh context every run keeps restart trivial and leak-free.
   if (synth) synth.ctx.close();
@@ -57,6 +83,7 @@ function start(index) {
   captionTitle.textContent = `${piece.title} — ${piece.composer.split('·')[0].trim()}`;
 
   synth.resume().then(() => {
+    if (token !== startToken) return;
     seq.start();
     overlay.classList.add('hidden');
     document.body.classList.add('playing');
@@ -64,6 +91,7 @@ function start(index) {
 }
 
 function backToMenu() {
+  startToken++;
   seq?.stop();
   if (synth) synth.ctx.close();
   synth = null;
@@ -87,13 +115,77 @@ document.getElementById('btn-prev').addEventListener('click', () => start(curren
 document.getElementById('btn-next').addEventListener('click', () => start(currentIndex + 1));
 document.getElementById('btn-play').addEventListener('click', togglePause);
 
+// — library explorer —
+let allItems = null;
+let shownItems = [];
+
+document.getElementById('explore-btn').addEventListener('click', async () => {
+  overlay.classList.add('exploring');
+  explorer.hidden = false;
+  exSearch.focus();
+  if (!allItems) {
+    exCount.textContent = 'loading the library…';
+    ({ items: allItems } = await loadCatalog());
+    renderExplorer('');
+  }
+});
+
+document.getElementById('ex-back').addEventListener('click', () => {
+  overlay.classList.remove('exploring');
+  explorer.hidden = true;
+});
+
+exSearch.addEventListener('input', () => renderExplorer(exSearch.value));
+
+function renderExplorer(query) {
+  const q = query.trim().toLowerCase();
+  shownItems = !q
+    ? allItems
+    : allItems.filter((it) =>
+        `${it.label} ${it.entry.composer} ${it.entry.instruments} ${it.entry.style}`.toLowerCase().includes(q)
+      );
+
+  exList.replaceChildren();
+  const cap = 120;
+  for (const it of shownItems.slice(0, cap)) {
+    const row = document.createElement('button');
+    row.className = 'ex-row';
+    const t = document.createElement('span');
+    t.className = 't';
+    t.textContent = it.label;
+    const c = document.createElement('span');
+    c.className = 'c';
+    c.textContent = it.entry.composer;
+    const i = document.createElement('span');
+    i.className = 'i';
+    i.textContent = `${it.entry.instruments} · ${it.entry.style}`;
+    row.append(t, c, i);
+    row.addEventListener('click', () => {
+      const list = shownItems;
+      playlist = list.map((x) => ({ label: x.label, load: () => loadCatalogPiece(x) }));
+      start(list.indexOf(it));
+    });
+    exList.appendChild(row);
+  }
+  exCount.textContent =
+    shownItems.length > cap
+      ? `showing ${cap} of ${shownItems.length} pieces — keep typing to narrow down`
+      : `${shownItems.length} ${shownItems.length === 1 ? 'piece' : 'pieces'}`;
+}
+
 window.addEventListener('keydown', (e) => {
   const inMenu = !overlay.classList.contains('hidden');
-  if (inMenu) return;
+  if (inMenu) {
+    if (e.key === 'Escape' && !explorer.hidden) {
+      overlay.classList.remove('exploring');
+      explorer.hidden = true;
+    }
+    return;
+  }
   if (e.code === 'Space') {
     e.preventDefault();
     togglePause();
-  } else if (e.key === 'r' || e.key === 'R') {
+  } else if ((e.key === 'r' || e.key === 'R') && e.target === document.body) {
     start(currentIndex);
   } else if (e.key === 'ArrowRight') {
     start(currentIndex + 1);

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Falling Notes — nine pieces for a quiet browser</title>
+  <title>Falling Notes — the Mutopia library, visible</title>
   <meta name="description" content="A space journey where music is visible: a 3D piano among streaming stars, nine pieces synthesized live in the browser — Bach, Satie, Beethoven, Chopin, Debussy, Vivaldi and an original dawn." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -16,9 +16,31 @@
 
   <div id="overlay">
     <h1>Falling <span class="accent">Notes</span></h1>
-    <p class="subtitle">nine pieces for a quiet browser</p>
+    <p class="subtitle">nine featured pieces · a library of 2124</p>
     <div id="pieces" role="list"></div>
-    <p class="hint">space — pause · r — restart · esc — back</p>
+    <button id="explore-btn">✦ explore the full Mutopia library — 2,100+ pieces</button>
+    <div id="explorer" hidden>
+      <div class="ex-head">
+        <button id="ex-back" aria-label="Back to featured">←</button>
+        <input id="ex-search" type="search" placeholder="search by title, composer, instrument, style…" autocomplete="off" />
+      </div>
+      <div id="ex-list" role="list"></div>
+      <p id="ex-count"></p>
+      <blockquote id="tribute">
+        <p>
+          This library exists because of the <a href="https://www.mutopiaproject.org/" target="_blank" rel="noopener">Mutopia Project</a> —
+          a quiet guild of volunteers who, since the year 2000, have been engraving the music of
+          centuries note by note, and giving it away to everyone, forever. No paywall, no applause;
+          just the patient conviction that Bach and Satie and a thousand forgotten dance tunes
+          belong to all of us. Libraries are how a civilization remembers. This page only makes
+          their gift visible — the memory itself is theirs.
+        </p>
+        <p class="tribute-sign">Thank you, keepers of the score. ♪</p>
+      </blockquote>
+    </div>
+    <p class="hint">space — pause · r — restart · ← → — prev / next · esc — back</p>
+    <p class="credit">music engraved with love by the volunteers of the
+      <a href="https://www.mutopiaproject.org/" target="_blank" rel="noopener">Mutopia Project</a></p>
   </div>
 
   <footer id="caption">

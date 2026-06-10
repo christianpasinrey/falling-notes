@@ -1,6 +1,15 @@
-// Soft piano voice built on Web Audio: a harmonically-rich periodic wave per
-// note, percussive envelope, pitch-dependent decay, gentle lowpass, and a
-// procedurally generated hall reverb. No samples, no dependencies.
+// Web Audio instrument voices — no samples, no dependencies. One synth serves
+// every family through patches: percussive piano, plucked strings, bowed
+// strings, winds, organ and voice, all sharing a procedural hall reverb.
+
+const PATCHES = {
+  piano: { harmonics: [0, 1, 0.42, 0.2, 0.1, 0.06, 0.035, 0.02], attack: 0.006, env: 'percussive', shimmer: true },
+  pluck: { harmonics: [0, 1, 0.55, 0.32, 0.16, 0.08, 0.04, 0.02], attack: 0.004, env: 'pluck', shimmer: true },
+  bow: { harmonics: [0, 1, 0.7, 0.45, 0.3, 0.22, 0.15, 0.1, 0.07], attack: 0.09, env: 'sustain', vibrato: { rate: 5.2, cents: 6, delay: 0.25 } },
+  wind: { harmonics: [0, 1, 0.16, 0.28, 0.07, 0.05], attack: 0.05, env: 'sustain', vibrato: { rate: 4.6, cents: 4, delay: 0.3 } },
+  organ: { harmonics: [0, 1, 0.55, 0.2, 0.45, 0.08, 0.22], attack: 0.012, env: 'sustain' },
+  voice: { harmonics: [0, 1, 0.35, 0.1, 0.04], attack: 0.08, env: 'sustain', vibrato: { rate: 5, cents: 8, delay: 0.35 } },
+};
 
 export class PianoSynth {
   constructor() {
@@ -30,10 +39,11 @@ export class PianoSynth {
     this.wet.connect(comp);
     comp.connect(this.ctx.destination);
 
-    // One shared wave: amplitudes fall off like a felt-hammer piano.
-    const harmonics = [0, 1, 0.42, 0.2, 0.1, 0.06, 0.035, 0.02];
-    const real = new Float32Array(harmonics.length).fill(0);
-    this.wave = this.ctx.createPeriodicWave(real, Float32Array.from(harmonics));
+    this.waves = {};
+    for (const [name, p] of Object.entries(PATCHES)) {
+      const real = new Float32Array(p.harmonics.length).fill(0);
+      this.waves[name] = this.ctx.createPeriodicWave(real, Float32Array.from(p.harmonics));
+    }
   }
 
   get now() {
@@ -49,19 +59,15 @@ export class PianoSynth {
   }
 
   /** Schedule a note. when/duration in seconds on the AudioContext clock. */
-  playNote(midi, when, duration, velocity = 0.7) {
+  playNote(midi, when, duration, velocity = 0.7, patch = 'piano') {
+    const p = PATCHES[patch] || PATCHES.piano;
     const freq = 440 * Math.pow(2, (midi - 69) / 12);
     const ctx = this.ctx;
+    const end = when + duration;
 
     const osc = ctx.createOscillator();
-    osc.setPeriodicWave(this.wave);
+    osc.setPeriodicWave(this.waves[patch] || this.waves.piano);
     osc.frequency.value = freq;
-
-    // Faint octave partial for hammer brightness, decays quickly.
-    const shimmer = ctx.createOscillator();
-    shimmer.type = 'sine';
-    shimmer.frequency.value = freq * 2;
-    const shimmerGain = ctx.createGain();
 
     const filter = ctx.createBiquadFilter();
     filter.type = 'lowpass';
@@ -70,36 +76,60 @@ export class PianoSynth {
     filter.Q.value = 0.4;
 
     const amp = ctx.createGain();
-
-    // Lower notes ring longer, like real strings.
-    const decay = 4.2 - (midi - 21) * 0.028;
     const peak = 0.16 * (0.35 + 0.65 * velocity);
-
-    // Hammer strike, quick settle to half, then a slow singing tail that
-    // keeps long notes audible for their whole written duration.
+    const decay = 4.2 - (midi - 21) * 0.028; // lower notes ring longer
     amp.gain.setValueAtTime(0, when);
-    amp.gain.linearRampToValueAtTime(peak, when + 0.006);
-    amp.gain.setTargetAtTime(peak * 0.5, when + 0.006, 0.18);
-    amp.gain.setTargetAtTime(peak * 0.08, when + 0.7, Math.max(decay * 0.8, 1.2));
+    amp.gain.linearRampToValueAtTime(peak, when + p.attack);
 
-    const release = 0.6;
-    const end = when + duration;
+    let release = 0.6;
+    if (p.env === 'percussive') {
+      amp.gain.setTargetAtTime(peak * 0.5, when + p.attack, 0.18);
+      amp.gain.setTargetAtTime(peak * 0.08, when + 0.7, Math.max(decay * 0.8, 1.2));
+    } else if (p.env === 'pluck') {
+      amp.gain.setTargetAtTime(0.0001, when + p.attack, Math.max(decay * 0.18, 0.25));
+      release = 0.3;
+    } else {
+      // sustain: settle slightly below peak and hold for the written length
+      amp.gain.setTargetAtTime(peak * 0.78, when + p.attack, 0.12);
+      release = 0.28;
+    }
     amp.gain.setTargetAtTime(0.0001, end, release / 3);
 
-    shimmerGain.gain.setValueAtTime(peak * 0.25, when);
-    shimmerGain.gain.setTargetAtTime(0.0001, when + 0.005, 0.18);
-
     osc.connect(filter);
-    shimmer.connect(shimmerGain);
-    shimmerGain.connect(filter);
     filter.connect(amp);
     amp.connect(this.master);
 
+    const stopAt = end + release * 2.5;
     osc.start(when);
-    shimmer.start(when);
-    const stopAt = end + release * 2;
     osc.stop(stopAt);
-    shimmer.stop(stopAt);
+
+    if (p.shimmer) {
+      const shimmer = ctx.createOscillator();
+      shimmer.type = 'sine';
+      shimmer.frequency.value = freq * 2;
+      const sg = ctx.createGain();
+      sg.gain.setValueAtTime(peak * 0.25, when);
+      sg.gain.setTargetAtTime(0.0001, when + 0.005, 0.18);
+      shimmer.connect(sg);
+      sg.connect(filter);
+      shimmer.start(when);
+      shimmer.stop(stopAt);
+    }
+
+    if (p.vibrato && duration > 0.35) {
+      const lfo = ctx.createOscillator();
+      lfo.frequency.value = p.vibrato.rate;
+      const depth = ctx.createGain();
+      depth.gain.setValueAtTime(0, when);
+      depth.gain.linearRampToValueAtTime(
+        freq * (Math.pow(2, p.vibrato.cents / 1200) - 1),
+        when + p.vibrato.delay + 0.3
+      );
+      lfo.connect(depth);
+      depth.connect(osc.frequency);
+      lfo.start(when + p.vibrato.delay);
+      lfo.stop(stopAt);
+    }
   }
 
   #impulseResponse(seconds, decay) {

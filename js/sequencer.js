@@ -41,11 +41,11 @@ export class Sequencer {
     this.timer = setInterval(() => {
       const horizon = this.songTime + LOOKAHEAD_S;
       while (this.nextIndex < notes.length) {
-        const [midi, startBeat, durBeats, , vel] = notes[this.nextIndex];
+        const [midi, startBeat, durBeats, , vel, patch] = notes[this.nextIndex];
         const startS = startBeat * this.spb;
         if (startS > horizon) break;
         const when = this.startCtxTime + LEAD_IN_S + startS;
-        this.synth.playNote(midi, when, durBeats * this.spb, vel);
+        this.synth.playNote(midi, when, durBeats * this.spb, vel, patch || 'piano');
         this.nextIndex++;
       }
       if (this.nextIndex >= notes.length && this.songTime > this.totalSeconds + 3) {

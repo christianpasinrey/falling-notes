@@ -32,6 +32,9 @@ export class Visualizer3D {
     this.lastT = -4;
 
     this.#buildPiano();
+    this.#buildStrings();
+    this.#buildWind();
+    this.deck = 'piano';
     this.#buildSpace();
     this.#buildLights();
     this.#buildParticles();
@@ -92,6 +95,75 @@ export class Visualizer3D {
     piano.add(base);
 
     this.scene.add(piano);
+    this.deckPiano = piano;
+  }
+
+  // a harp standing where the piano was: one string per pitch, longer = lower
+  #buildStrings() {
+    const g = new THREE.Group();
+    this.strings = new Map();
+    const geo = new THREE.BoxGeometry(0.09, 1, 0.09);
+    geo.translate(0, 0.5, 0); // grow upward from the base
+    for (const [midi, k] of this.layout.keys) {
+      const mat = new THREE.MeshStandardMaterial({
+        color: 0xb9c4d6, roughness: 0.3, metalness: 0.75,
+        emissive: 0x000000, emissiveIntensity: 0,
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      const h = 2.6 + ((108 - midi) / 87) * 6.5;
+      mesh.scale.y = h;
+      mesh.position.set(k.x + k.w / 2 - 26, 0, 2.2);
+      g.add(mesh);
+      this.strings.set(midi, { mesh, mat, baseX: k.x + k.w / 2 - 26, press: 0, hand: null });
+    }
+    const board = new THREE.Mesh(
+      new THREE.BoxGeometry(53.6, 0.9, 5.2),
+      new THREE.MeshStandardMaterial({ color: 0x141021, roughness: 0.45, metalness: 0.3 })
+    );
+    board.position.set(0, -0.5, 2.6);
+    g.add(board);
+    const yoke = new THREE.Mesh(
+      new THREE.BoxGeometry(53.6, 0.35, 0.5),
+      new THREE.MeshStandardMaterial({ color: 0x2a2438, roughness: 0.4, metalness: 0.5 })
+    );
+    yoke.position.set(0, 9.4, 2.2);
+    g.add(yoke);
+    g.visible = false;
+    this.scene.add(g);
+    this.deckStrings = g;
+  }
+
+  // a great flute lying across space: one tone hole per pitch
+  #buildWind() {
+    const g = new THREE.Group();
+    this.holes = new Map();
+    const tube = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.85, 0.85, 53.8, 24),
+      new THREE.MeshStandardMaterial({ color: 0x4a3b28, roughness: 0.35, metalness: 0.6 })
+    );
+    tube.rotation.z = Math.PI / 2;
+    tube.position.set(0, 0.5, 2.4);
+    g.add(tube);
+    const lip = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.05, 1.05, 0.6, 24),
+      new THREE.MeshStandardMaterial({ color: 0x6a563a, roughness: 0.3, metalness: 0.7 })
+    );
+    lip.rotation.z = Math.PI / 2;
+    lip.position.set(-27, 0.5, 2.4);
+    g.add(lip);
+    const holeGeo = new THREE.CylinderGeometry(0.3, 0.3, 0.18, 16);
+    for (const [midi, k] of this.layout.keys) {
+      const mat = new THREE.MeshStandardMaterial({
+        color: 0x0a0805, roughness: 0.5, emissive: 0x000000, emissiveIntensity: 0,
+      });
+      const mesh = new THREE.Mesh(holeGeo, mat);
+      mesh.position.set(k.x + k.w / 2 - 26, 1.32, k.black ? 1.9 : 2.55);
+      g.add(mesh);
+      this.holes.set(midi, { mesh, mat, baseY: 1.32, press: 0 });
+    }
+    g.visible = false;
+    this.scene.add(g);
+    this.deckWind = g;
   }
 
   #buildSpace() {
@@ -183,6 +255,11 @@ export class Visualizer3D {
     this.rail.material.color.copy(new THREE.Color(piece.accent)).multiplyScalar(0.55);
     const neb = new THREE.Color(piece.accent).lerp(new THREE.Color(0x223a6a), 0.55);
     for (const s of this.nebulas) s.material.color.copy(neb);
+
+    this.deck = piece.deck || 'piano';
+    this.deckPiano.visible = this.deck === 'piano';
+    this.deckStrings.visible = this.deck === 'strings';
+    this.deckWind.visible = this.deck === 'wind';
     this.reset();
   }
 
@@ -304,18 +381,43 @@ export class Visualizer3D {
         if (n.hand === 'L') energyL += n.vel; else energyR += n.vel;
       }
     }
-    for (const [midi, k] of this.keys) {
-      const n = activeByMidi.get(midi);
-      const target = n ? 1 : 0;
-      k.press += (target - k.press) * Math.min(dt * 18, 1);
-      k.mesh.rotation.x = k.press * 0.055;
-      if (n) {
-        k.mat.emissive.copy(this.handColors?.[n.hand] || new THREE.Color(0x6fb7ff));
-        k.mat.emissiveIntensity = 0.55 * k.press * (0.5 + n.vel * 0.5);
-      } else if (k.press < 0.02) {
-        k.mat.emissiveIntensity = 0;
-      } else {
-        k.mat.emissiveIntensity *= 0.9;
+    const tNow = this.lastT;
+    if (this.deck === 'piano') {
+      for (const [midi, k] of this.keys) {
+        const n = activeByMidi.get(midi);
+        k.press += ((n ? 1 : 0) - k.press) * Math.min(dt * 18, 1);
+        k.mesh.rotation.x = k.press * 0.055;
+        if (n) {
+          k.mat.emissive.copy(this.handColors?.[n.hand] || new THREE.Color(0x6fb7ff));
+          k.mat.emissiveIntensity = 0.55 * k.press * (0.5 + n.vel * 0.5);
+        } else {
+          k.mat.emissiveIntensity *= k.press < 0.02 ? 0 : 0.9;
+        }
+      }
+    } else if (this.deck === 'strings') {
+      for (const [midi, s] of this.strings) {
+        const n = activeByMidi.get(midi);
+        // strings keep ringing a moment after the note ends
+        s.press += ((n ? 1 : 0) - s.press) * Math.min(dt * (n ? 22 : 2.2), 1);
+        s.mesh.position.x = s.baseX + Math.sin(tNow * 55 + midi) * 0.07 * s.press;
+        if (n) {
+          s.mat.emissive.copy(this.handColors?.[n.hand] || new THREE.Color(0x6fb7ff));
+          s.mat.emissiveIntensity = 0.9 * (0.5 + n.vel * 0.5);
+        } else {
+          s.mat.emissiveIntensity *= 0.95;
+        }
+      }
+    } else {
+      for (const [midi, h] of this.holes) {
+        const n = activeByMidi.get(midi);
+        h.press += ((n ? 1 : 0) - h.press) * Math.min(dt * 16, 1);
+        h.mesh.position.y = h.baseY + h.press * 0.16;
+        if (n) {
+          h.mat.emissive.copy(this.handColors?.[n.hand] || new THREE.Color(0x6fb7ff));
+          h.mat.emissiveIntensity = 1.1 * (0.4 + n.vel * 0.6);
+        } else {
+          h.mat.emissiveIntensity *= 0.9;
+        }
       }
     }
     this.lampL.intensity = Math.min(energyL * 7, 16);
