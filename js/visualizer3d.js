@@ -55,12 +55,12 @@ export class Visualizer3D {
     this.keys = new Map();
     const piano = new THREE.Group();
 
-    // pivot like a seesaw at 70% of the key length: the impact side (far,
-    // where notes land) sinks and the near side lifts slightly
+    // seesaw pivot at 30% from the back: the near side (toward the viewer)
+    // sinks under the finger and the far side lifts slightly
     const whiteGeo = new THREE.BoxGeometry(0.94, 0.5, 5.8);
-    whiteGeo.translate(0, -0.25, -1.16);
+    whiteGeo.translate(0, -0.25, 1.16);
     const blackGeo = new THREE.BoxGeometry(0.56, 0.55, 3.6);
-    blackGeo.translate(0, -0.2, -0.72);
+    blackGeo.translate(0, -0.2, 0.72);
 
     for (const [midi, k] of this.layout.keys) {
       const mat = new THREE.MeshStandardMaterial(
@@ -69,7 +69,7 @@ export class Visualizer3D {
           : { color: 0xdfe3ea, roughness: 0.6, metalness: 0.03 }
       );
       const mesh = new THREE.Mesh(k.black ? blackGeo : whiteGeo, mat);
-      mesh.position.set(k.x + k.w / 2 - 26, k.black ? 0.45 : 0.25, k.black ? 2.52 : 4.06);
+      mesh.position.set(k.x + k.w / 2 - 26, k.black ? 0.45 : 0.25, k.black ? 1.08 : 1.74);
       piano.add(mesh);
       this.keys.set(midi, { mesh, mat, black: k.black, press: 0, hand: null });
     }
@@ -308,7 +308,7 @@ export class Visualizer3D {
       const n = activeByMidi.get(midi);
       const target = n ? 1 : 0;
       k.press += (target - k.press) * Math.min(dt * 18, 1);
-      k.mesh.rotation.x = -k.press * 0.055;
+      k.mesh.rotation.x = k.press * 0.055;
       if (n) {
         k.mat.emissive.copy(this.handColors?.[n.hand] || new THREE.Color(0x6fb7ff));
         k.mat.emissiveIntensity = 0.55 * k.press * (0.5 + n.vel * 0.5);
