@@ -2,6 +2,28 @@
 // every family through patches: percussive piano, plucked strings, bowed
 // strings, winds, organ and voice, all sharing a procedural hall reverb.
 
+// — Salamander grand piano (Alexander Holm, CC-BY) —
+// 30 samples a minor third apart; each note pitch-shifts its nearest
+// neighbour (≤1 semitone once fully loaded). Decoding happens on an offline
+// context at import time, so buffers outlive every per-piece AudioContext and
+// notes fall back to the procedural voice until their sample arrives.
+const SAMPLE_MIDIS = [];
+for (let m = 21; m <= 108; m += 3) SAMPLE_MIDIS.push(m);
+const sampleName = (m) => ({ 0: 'C', 3: 'Ds', 6: 'Fs', 9: 'A' })[m % 12] + (Math.floor(m / 12) - 1);
+const sampleBuffers = new Map(); // midi -> AudioBuffer
+try {
+  const decodeCtx = new OfflineAudioContext(2, 1, 44100);
+  for (const m of SAMPLE_MIDIS) {
+    fetch(`assets/salamander/${sampleName(m)}.mp3`)
+      .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error('http ' + r.status))))
+      .then((buf) => decodeCtx.decodeAudioData(buf))
+      .then((audio) => sampleBuffers.set(m, audio))
+      .catch(() => {}); // that note simply keeps the synth voice
+  }
+} catch {
+  // no OfflineAudioContext: the procedural piano carries the whole show
+}
+
 const PATCHES = {
   piano: { harmonics: [0, 1, 0.42, 0.2, 0.1, 0.06, 0.035, 0.02], attack: 0.006, env: 'percussive', shimmer: true },
   pluck: { harmonics: [0, 1, 0.55, 0.32, 0.16, 0.08, 0.04, 0.02], attack: 0.004, env: 'pluck', shimmer: true },
@@ -63,8 +85,42 @@ export class PianoSynth {
     return this.ctx.suspend();
   }
 
+  /** Sampled piano voice; null while the needed sample is still loading. */
+  #sampleNodes(midi, when, velocity) {
+    let best = null, bestD = 99;
+    for (const m of sampleBuffers.keys()) {
+      const d = Math.abs(m - midi);
+      if (d < bestD) { bestD = d; best = m; }
+    }
+    if (best === null || bestD > 6) return null; // too far a shift sounds wrong
+    const ctx = this.ctx;
+    const src = ctx.createBufferSource();
+    src.buffer = sampleBuffers.get(best);
+    src.playbackRate.value = Math.pow(2, (midi - best) / 12);
+    // one velocity layer: darken soft notes, keep loud ones bright
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = Math.min(1000 + 15000 * Math.pow(velocity, 1.4), 18000);
+    const amp = ctx.createGain();
+    amp.gain.setValueAtTime(0.45 * (0.3 + 0.7 * velocity), when);
+    src.connect(filter);
+    filter.connect(amp);
+    amp.connect(this.master);
+    src.start(when);
+    return { src, amp };
+  }
+
   /** Schedule a note. when/duration in seconds on the AudioContext clock. */
   playNote(midi, when, duration, velocity = 0.7, patch = 'piano') {
+    if (patch === 'piano') {
+      const v = this.#sampleNodes(midi, when, velocity);
+      if (v) {
+        // the sample carries its own decay; just release at the written end
+        v.amp.gain.setTargetAtTime(0.0001, when + duration, 0.09);
+        v.src.stop(when + duration + 1);
+        return;
+      }
+    }
     const p = PATCHES[patch] || PATCHES.piano;
     const freq = 440 * Math.pow(2, (midi - 69) / 12);
     const ctx = this.ctx;
@@ -141,6 +197,11 @@ export class PianoSynth {
   noteOn(midi, velocity = 0.8) {
     this.noteOff(midi); // retrigger cleanly
     const when = this.now;
+    const sampled = this.#sampleNodes(midi, when, velocity);
+    if (sampled) {
+      this.liveVoices.set(midi, { amp: sampled.amp, sources: [sampled.src] });
+      return;
+    }
     const p = PATCHES.piano;
     const freq = 440 * Math.pow(2, (midi - 69) / 12);
     const ctx = this.ctx;
@@ -180,7 +241,7 @@ export class PianoSynth {
     shimmer.start(when);
     shimmer.stop(when + 12);
 
-    this.liveVoices.set(midi, { osc, shimmer, amp });
+    this.liveVoices.set(midi, { amp, sources: [osc, shimmer] });
   }
 
   noteOff(midi) {
@@ -284,8 +345,7 @@ export class PianoSynth {
   #releaseVoice(v) {
     const t = this.now;
     v.amp.gain.setTargetAtTime(0.0001, t, 0.09);
-    v.osc.stop(t + 0.8);
-    v.shimmer.stop(t + 0.8);
+    for (const s of v.sources) s.stop(t + 0.8);
   }
 
   #impulseResponse(seconds, decay) {

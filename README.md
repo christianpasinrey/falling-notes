@@ -101,4 +101,8 @@ Then wrap it with a small module declaring title, mood, tempo and colors
 
 Code: MIT. All featured composers are long in the public domain; the Vivaldi
 arrangement and *Aurora* are released to the public domain as well. Mutopia
-pieces carry their own Public Domain or Creative Commons licenses.
+pieces carry their own Public Domain or Creative Commons licenses. The piano
+sound uses samples from the
+[Salamander Grand Piano](https://github.com/sfzinstruments/SalamanderGrandPiano)
+by Alexander Holm (CC-BY), loaded progressively with the procedural synth as
+fallback; every other instrument remains pure Web Audio synthesis.
