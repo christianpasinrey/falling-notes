@@ -289,19 +289,21 @@ export class Visualizer3D {
     for (const s of this.labelGroup.children) s.material.dispose();
     this.labelGroup.clear();
     if (!labels) return;
-    for (const [midi, ch] of labels) {
+    for (const [midi, label] of labels) {
       const k = this.layout.keys.get(midi);
+      const { ch, mod } = typeof label === 'string' ? { ch: label, mod: null } : label;
       if (!k || !ch) continue;
-      let tex = this.labelTex.get(ch);
+      const cacheKey = (mod || '') + ch;
+      let tex = this.labelTex.get(cacheKey);
       if (!tex) {
-        tex = makeLabelTexture(ch);
-        this.labelTex.set(ch, tex);
+        tex = makeLabelTexture(ch, mod);
+        this.labelTex.set(cacheKey, tex);
       }
       const sprite = new THREE.Sprite(
-        new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, opacity: 0.92 })
+        new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, opacity: mod ? 0.75 : 0.92 })
       );
       sprite.position.set(k.x + k.w / 2 - 26, k.black ? 1.0 : 0.55, k.black ? 2.6 : 4.7);
-      sprite.scale.set(0.62, 0.62, 1);
+      sprite.scale.set(mod ? 0.86 : 0.62, 0.62, 1);
       sprite.renderOrder = 10;
       this.labelGroup.add(sprite);
     }
@@ -530,22 +532,39 @@ export class Visualizer3D {
   }
 }
 
-function makeLabelTexture(ch) {
+function makeLabelTexture(ch, mod) {
   const c = document.createElement('canvas');
-  c.width = c.height = 96;
+  c.width = mod ? 132 : 96;
+  c.height = 96;
   const ctx = c.getContext('2d');
-  ctx.beginPath();
-  ctx.arc(48, 48, 40, 0, Math.PI * 2);
   ctx.fillStyle = 'rgba(7, 11, 22, 0.82)';
-  ctx.fill();
   ctx.lineWidth = 3;
-  ctx.strokeStyle = 'rgba(150, 190, 255, 0.85)';
-  ctx.stroke();
-  ctx.fillStyle = '#eaf2ff';
-  ctx.font = '600 42px system-ui, -apple-system, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(ch, 48, 50);
+  ctx.strokeStyle = mod ? 'rgba(150, 190, 255, 0.45)' : 'rgba(150, 190, 255, 0.85)';
+  if (mod) {
+    // wider pill for shift combos: ⇧A
+    ctx.beginPath();
+    ctx.roundRect(4, 8, 124, 80, 40);
+    ctx.fill();
+    ctx.stroke();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#9fb5d8';
+    ctx.font = '600 34px system-ui, -apple-system, sans-serif';
+    ctx.fillText('⇧', 42, 50);
+    ctx.fillStyle = '#eaf2ff';
+    ctx.font = '600 38px system-ui, -apple-system, sans-serif';
+    ctx.fillText(ch, 86, 50);
+  } else {
+    ctx.beginPath();
+    ctx.arc(48, 48, 40, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#eaf2ff';
+    ctx.font = '600 42px system-ui, -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(ch, 48, 50);
+  }
   return new THREE.CanvasTexture(c);
 }
 

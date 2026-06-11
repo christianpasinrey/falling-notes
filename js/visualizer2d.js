@@ -379,18 +379,22 @@ export class Visualizer {
       ctx.textBaseline = 'middle';
       const size = Math.max(10, Math.min(this.layout.whiteW * 0.55, 16));
       ctx.font = `600 ${size}px system-ui, -apple-system, sans-serif`;
-      for (const [midi, ch] of this.keyLabels) {
+      for (const [midi, label] of this.keyLabels) {
         const k = keys.get(midi);
+        const { ch, mod } = typeof label === 'string' ? { ch: label, mod: null } : label;
         if (!k || !ch) continue;
         const cx = k.x + k.w / 2;
+        const text = mod ? '⇧' + ch : ch;
+        ctx.globalAlpha = mod ? 0.65 : 1;
         if (k.black) {
           ctx.fillStyle = '#dfe6f2';
-          ctx.fillText(ch, cx, hitY + bH - size * 0.9);
+          ctx.fillText(text, cx, hitY + bH - size * 0.9);
         } else {
           ctx.fillStyle = '#39414f';
-          ctx.fillText(ch, cx, hitY + kbH - size * 0.9);
+          ctx.fillText(text, cx, hitY + kbH - size * 0.9);
         }
       }
+      ctx.globalAlpha = 1;
       ctx.restore();
     }
   }

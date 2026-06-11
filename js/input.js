@@ -54,10 +54,23 @@ export class NoteInput {
     return 'C' + (this.effectiveBase / 12 - 1);
   }
 
-  /** midi -> key-cap label for the current QWERTY octave. */
+  /**
+   * midi -> {ch, mod} for every key the QWERTY layout can reach from home:
+   * the centre octaves plain, one octave left via held left shift (mod 'L'),
+   * one octave right via held right shift (mod 'R'). Plain wins overlaps.
+   * Keyed to the home octave so the map stays put while shifts are held.
+   */
   labelMap() {
     const m = new Map();
-    for (const [code, semi] of KEY_TO_SEMITONE) m.set(this.effectiveBase + semi, this.labels.get(code));
+    const zone = (offset, mod) => {
+      for (const [code, semi] of KEY_TO_SEMITONE) {
+        const midi = this.baseMidi + offset + semi;
+        if (midi >= 21 && midi <= 108 && !m.has(midi)) m.set(midi, { ch: this.labels.get(code), mod });
+      }
+    };
+    zone(0, null);
+    zone(-12, 'L');
+    zone(12, 'R');
     return m;
   }
 
