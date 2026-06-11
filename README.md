@@ -64,11 +64,10 @@ original dawn — plus **all 2124 pieces of the
 [Mutopia Project](https://www.mutopiaproject.org/)** through a searchable
 explorer (title, composer, instrument, style). Each engraving's MIDI loads on
 demand and every track is voiced by instrument family — percussive piano,
-plucked or bowed strings, winds, organ, voice. The instrument in the scene
-follows the music: keyboards land on the 3D piano, plucked and bowed pieces on
-a great harp whose strings ring, winds on a flute lying across space. Every
-piece keeps its license metadata as published by Mutopia. This page is a
-homage to that project: decades of volunteer engraving, made visible.
+plucked or bowed strings, winds, organ, voice — while everything lands on the
+3D piano, the instrument a MIDI keyboard player actually has. Every piece
+keeps its license metadata as published by Mutopia. This page is a homage to
+that project: decades of volunteer engraving, made visible.
 
 ## How it works
 
