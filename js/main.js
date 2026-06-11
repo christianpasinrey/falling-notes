@@ -145,6 +145,19 @@ function pickVoice(v) {
   start(currentIndex); // the judge and the silence map depend on it
 }
 
+// — drums: a groove laid on the piece's own beat grid —
+const beatSelect = document.getElementById('beat-select');
+let beat = localStorage.getItem('fn-beat') || '';
+if ([...beatSelect.options].some((o) => o.value === beat)) beatSelect.value = beat;
+else beat = '';
+beatSelect.classList.toggle('on', !!beat);
+beatSelect.addEventListener('change', () => {
+  beat = beatSelect.value;
+  localStorage.setItem('fn-beat', beat);
+  beatSelect.classList.toggle('on', !!beat);
+  seq?.setDrums(beat || null);
+});
+
 // — metronome: ticks on the piece's own beat grid —
 let metronome = localStorage.getItem('fn-metronome') === '1';
 const metroBtn = document.getElementById('btn-metronome');
@@ -273,6 +286,7 @@ async function start(index) {
   });
   seq.onended = () => start(currentIndex + 1); // autoplay: on to the next
   seq.setMetronome(metronome);
+  seq.setDrums(beat || null);
   viz.setPiece(piece);
   setPaused(false);
   voicesBtn.style.display = piece.voices.length > 1 ? '' : 'none';

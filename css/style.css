@@ -437,6 +437,20 @@ body.playing #controls:hover { opacity: 1; }
   background: color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
+#beat-select {
+  border: none;
+  background: transparent;
+  color: var(--ink-dim);
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-style: italic;
+  cursor: pointer;
+  outline: none;
+  max-width: 6rem;
+}
+#beat-select.on { color: var(--accent); }
+#beat-select option { background: #0a0d15; color: var(--ink); font-style: normal; }
+
 /* ---- voices / tracks panel ---- */
 #voices-panel[hidden] { display: none; }
 #voices-panel {

@@ -199,6 +199,73 @@ export class PianoSynth {
     }
   }
 
+  /** Synthesized drum kit — kick, snare, closed/open hat. No samples. */
+  drum(type, when, vel = 1) {
+    const ctx = this.ctx;
+    if (type === 'kick') {
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(150, when);
+      osc.frequency.exponentialRampToValueAtTime(45, when + 0.12);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.5 * vel, when);
+      g.gain.exponentialRampToValueAtTime(0.001, when + 0.22);
+      osc.connect(g);
+      g.connect(this.dry);
+      osc.start(when);
+      osc.stop(when + 0.25);
+    } else if (type === 'snare') {
+      const src = ctx.createBufferSource();
+      src.buffer = this.#noiseBuffer();
+      const f = ctx.createBiquadFilter();
+      f.type = 'highpass';
+      f.frequency.value = 1700;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.26 * vel, when);
+      g.gain.exponentialRampToValueAtTime(0.001, when + 0.13);
+      src.connect(f);
+      f.connect(g);
+      g.connect(this.dry);
+      src.start(when);
+      src.stop(when + 0.15);
+      const body = ctx.createOscillator();
+      body.type = 'triangle';
+      body.frequency.value = 185;
+      const bg = ctx.createGain();
+      bg.gain.setValueAtTime(0.16 * vel, when);
+      bg.gain.exponentialRampToValueAtTime(0.001, when + 0.08);
+      body.connect(bg);
+      bg.connect(this.dry);
+      body.start(when);
+      body.stop(when + 0.1);
+    } else {
+      const open = type === 'openhat';
+      const src = ctx.createBufferSource();
+      src.buffer = this.#noiseBuffer();
+      const f = ctx.createBiquadFilter();
+      f.type = 'highpass';
+      f.frequency.value = 7000;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.12 * vel, when);
+      g.gain.exponentialRampToValueAtTime(0.001, when + (open ? 0.35 : 0.05));
+      src.connect(f);
+      f.connect(g);
+      g.connect(this.dry);
+      src.start(when);
+      src.stop(when + (open ? 0.4 : 0.08));
+    }
+  }
+
+  #noiseBuffer() {
+    if (!this._noise) {
+      const rate = this.ctx.sampleRate;
+      this._noise = this.ctx.createBuffer(1, rate * 0.5, rate);
+      const d = this._noise.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    }
+    return this._noise;
+  }
+
   /** Metronome click — dry path only, so it stays crisp under the reverb. */
   tick(when, strong = false) {
     const ctx = this.ctx;
