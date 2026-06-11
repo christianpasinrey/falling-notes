@@ -145,6 +145,17 @@ function pickVoice(v) {
   start(currentIndex); // the judge and the silence map depend on it
 }
 
+// — metronome: ticks on the piece's own beat grid —
+let metronome = localStorage.getItem('fn-metronome') === '1';
+const metroBtn = document.getElementById('btn-metronome');
+metroBtn.classList.toggle('on', metronome);
+metroBtn.addEventListener('click', () => {
+  metronome = !metronome;
+  localStorage.setItem('fn-metronome', metronome ? '1' : '0');
+  metroBtn.classList.toggle('on', metronome);
+  seq?.setMetronome(metronome);
+});
+
 input.onnoteon = (midi, vel) => {
   if (!synth || paused) return;
   synth.noteOn(midi, vel);
@@ -261,6 +272,7 @@ async function start(index) {
     muted: mutedVoices,
   });
   seq.onended = () => start(currentIndex + 1); // autoplay: on to the next
+  seq.setMetronome(metronome);
   viz.setPiece(piece);
   setPaused(false);
   voicesBtn.style.display = piece.voices.length > 1 ? '' : 'none';

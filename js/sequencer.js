@@ -18,6 +18,12 @@ export class Sequencer {
     // others accompany. muted is shared live with the UI.
     this.playerVoice = playerVoice;
     this.muted = muted;
+    // metronome: tick on the piece's beat grid (real beats for MIDI pieces
+    // via their tempo map; the integer grid for hand-authored ones)
+    this.metronome = false;
+    this.beats = piece.beatTimes || Array.from({ length: Math.ceil(piece.totalBeats) + 1 }, (_, i) => i);
+    this.beatsPerBar = piece.beatsPerBar || 0;
+    this.beatIndex = 0;
     // The look-ahead walk requires chronological order; piece data may be
     // authored voice-by-voice, so never assume it.
     this.notes = [...piece.notes].sort((a, b) => a[1] - b[1]);
@@ -50,6 +56,17 @@ export class Sequencer {
     this.startCtxTime += this.songTime - t;
   }
 
+  setMetronome(on) {
+    this.metronome = on;
+    if (on) {
+      // skip the ticks already behind us
+      const t = this.songTime;
+      let i = 0;
+      while (i < this.beats.length && this.beats[i] * this.spb < t) i++;
+      this.beatIndex = i;
+    }
+  }
+
   #run() {
     const notes = this.notes;
     this.timer = setInterval(() => {
@@ -65,6 +82,17 @@ export class Sequencer {
           this.muted.has(voice) || this.playerVoice === 'all' || this.playerVoice === voice;
         if (!silent) this.synth.playNote(midi, when, durBeats * this.spb, vel, patch || 'piano');
         this.nextIndex++;
+      }
+      if (this.metronome) {
+        while (this.beatIndex < this.beats.length) {
+          const beatS = this.beats[this.beatIndex] * this.spb;
+          if (beatS > horizon) break;
+          this.synth.tick(
+            this.startCtxTime + LEAD_IN_S + beatS,
+            this.beatsPerBar > 1 && this.beatIndex % this.beatsPerBar === 0
+          );
+          this.beatIndex++;
+        }
       }
       if (this.nextIndex >= notes.length && this.songTime > this.totalSeconds + 3) {
         this.stop();

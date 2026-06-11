@@ -199,6 +199,21 @@ export class PianoSynth {
     }
   }
 
+  /** Metronome click — dry path only, so it stays crisp under the reverb. */
+  tick(when, strong = false) {
+    const ctx = this.ctx;
+    const osc = ctx.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.value = strong ? 1900 : 1300;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(strong ? 0.16 : 0.11, when);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + 0.05);
+    osc.connect(g);
+    g.connect(this.dry);
+    osc.start(when);
+    osc.stop(when + 0.08);
+  }
+
   #releaseVoice(v) {
     const t = this.now;
     v.amp.gain.setTargetAtTime(0.0001, t, 0.09);

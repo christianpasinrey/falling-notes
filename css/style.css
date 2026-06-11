@@ -431,7 +431,8 @@ body.playing #controls:hover { opacity: 1; }
   background: color-mix(in srgb, var(--accent) 28%, transparent);
 }
 #controls .ctl-mode { width: 30px; height: 30px; font-size: 0.95rem; }
-#controls .ctl-mode.on {
+#controls .ctl-mode.on,
+#controls #btn-metronome.on {
   color: var(--accent);
   background: color-mix(in srgb, var(--accent) 16%, transparent);
 }

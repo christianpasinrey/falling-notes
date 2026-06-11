@@ -75,8 +75,13 @@ export function buildPieceFromMidiSet(files /* [{buf, name}] */) {
   const voices = [];
   const famCount = { piano: 0, strings: 0, wind: 0 };
   let duration = 0;
+  let beatTimes = null, beatsPerBar = 4;
   files.forEach((f, vi) => {
-    const { notes, duration: d, tracks } = parseMidi(f.buf);
+    const { notes, duration: d, tracks, beats, beatsPerBar: bpb } = parseMidi(f.buf);
+    if (!beatTimes || beats.length > beatTimes.length) {
+      beatTimes = beats; // the longest file's grid drives the metronome
+      beatsPerBar = bpb;
+    }
     const named = tracks.find((t) => t.name);
     const program = tracks.find((t) => t.program >= 0)?.program ?? -1;
     const patch = classifyPatch(named?.name, program, '');
@@ -112,6 +117,8 @@ export function buildPieceFromMidiSet(files /* [{buf, name}] */) {
     voices,
     notes: allNotes,
     totalBeats: duration,
+    beatTimes,
+    beatsPerBar,
   };
 }
 
@@ -120,7 +127,7 @@ const seedFrom = (name) => [...name].reduce((a, c) => a + c.charCodeAt(0), 0);
 /** Turn any Standard MIDI File into a playable piece — catalog entries and
  *  user-supplied local files alike. Nothing ever leaves the browser. */
 export function buildPieceFromMidi(buf, { id, idSeed = 0, title = 'untitled', composer = '', mood = 'midi', marking = '', instruments = '' } = {}) {
-  const { notes, duration, tracks } = parseMidi(buf);
+  const { notes, duration, tracks, beats, beatsPerBar } = parseMidi(buf);
 
   // voice each track; first two note-bearing tracks get the R/L color pair
   const noteTracks = tracks.map((t, i) => ({ ...t, i })).filter((t) => t.noteCount > 0);
@@ -164,6 +171,8 @@ export function buildPieceFromMidi(buf, { id, idSeed = 0, title = 'untitled', co
     voices,
     notes: notes.map((n) => [n.midi, n.start, n.dur, handByTrack[n.track] || 'L', n.vel, patchByTrack[n.track] || 'piano', voiceByTrack[n.track] ?? 0]),
     totalBeats: duration,
+    beatTimes: beats, // real quarter notes in seconds (= beat units at bpm 60)
+    beatsPerBar,
   };
 }
 

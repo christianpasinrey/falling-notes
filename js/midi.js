@@ -24,6 +24,7 @@ export function parseMidi(arrayBuffer) {
 
   const tracks = [];
   const tempoEvents = [{ tick: 0, usPerQ: 500000 }];
+  let timeSig = 0;
   for (let t = 0; t < ntrks; t++) {
     if (ascii(pos, 4) !== 'MTrk') throw new Error('bad track chunk');
     pos += 4;
@@ -46,6 +47,7 @@ export function parseMidi(arrayBuffer) {
       else if (status === 0xff) {
         const mtype = read8(), mlen = readVarLen();
         if (mtype === 0x51) tempoEvents.push({ tick, usPerQ: (bytes[pos] << 16) | (bytes[pos + 1] << 8) | bytes[pos + 2] });
+        else if (mtype === 0x58 && !timeSig) timeSig = bytes[pos]; // numerator: beats per bar
         else if ((mtype === 0x03 || mtype === 0x04) && !meta.name) meta.name = ascii(pos, mlen);
         pos += mlen;
       } else if (status === 0xf0 || status === 0xf7) pos += readVarLen();
@@ -95,9 +97,22 @@ export function parseMidi(arrayBuffer) {
   notes.sort((a, b) => a.start - b.start || a.midi - b.midi);
   const duration = notes.reduce((m, n) => Math.max(m, n.start + n.dur), 0);
 
+  // quarter-note grid in real seconds, walked through the tempo map — this is
+  // what a metronome ticks on
+  const beats = [];
+  if (division > 0) {
+    for (let tick = 0; beats.length < 100000; tick += division) {
+      const s = tickToSec(tick);
+      if (s > duration) break;
+      beats.push(s);
+    }
+  }
+
   return {
     notes,
     duration,
+    beats,
+    beatsPerBar: timeSig || 4,
     tracks: tracks.map((t) => ({ name: t.name, program: t.program, noteCount: t.events.filter((e) => e.on).length })),
   };
 }
