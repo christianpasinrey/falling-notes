@@ -23,6 +23,8 @@ export class NoteInput {
     this.midiName = null; // connected MIDI device name, if any
     this.attached = false;
     this.held = new Map(); // code -> sounding midi, so octave shifts never strand a note
+    this.shiftL = false; // held left shift reaches one octave down…
+    this.shiftR = false; // …held right shift one octave up
 
     // Printed key caps for on-screen labels. KeyboardLayoutMap (Chromium)
     // gives the real legend — Ñ instead of ';' on a Spanish keyboard.
@@ -42,15 +44,20 @@ export class NoteInput {
     return this.midiName ? 'midi' : 'keyboard';
   }
 
+  /** Octave the QWERTY 'A' key plays right now, shifts included. */
+  get effectiveBase() {
+    return this.baseMidi + (this.shiftL ? -12 : 0) + (this.shiftR ? 12 : 0);
+  }
+
   /** "C4" for the octave the QWERTY 'A' key currently plays. */
   get octaveName() {
-    return 'C' + (this.baseMidi / 12 - 1);
+    return 'C' + (this.effectiveBase / 12 - 1);
   }
 
   /** midi -> key-cap label for the current QWERTY octave. */
   labelMap() {
     const m = new Map();
-    for (const [code, semi] of KEY_TO_SEMITONE) m.set(this.baseMidi + semi, this.labels.get(code));
+    for (const [code, semi] of KEY_TO_SEMITONE) m.set(this.effectiveBase + semi, this.labels.get(code));
     return m;
   }
 
@@ -93,6 +100,7 @@ export class NoteInput {
     window.removeEventListener('keyup', this.#keyup);
     for (const midi of this.held.values()) this.onnoteoff?.(midi);
     this.held.clear();
+    this.shiftL = this.shiftR = false;
   }
 
   #midiMessage(e) {
@@ -106,6 +114,11 @@ export class NoteInput {
 
   #keydown = (e) => {
     if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+      this[e.code === 'ShiftLeft' ? 'shiftL' : 'shiftR'] = true;
+      this.onchange?.();
+      return;
+    }
     if (e.code === 'KeyZ' || e.code === 'KeyX') {
       const next = Math.min(Math.max(this.baseMidi + (e.code === 'KeyZ' ? -12 : 12), 24), 84);
       if (next !== this.baseMidi) {
@@ -116,12 +129,18 @@ export class NoteInput {
     }
     const semi = KEY_TO_SEMITONE.get(e.code);
     if (semi === undefined || this.held.has(e.code)) return;
-    const midi = this.baseMidi + semi;
+    const midi = this.effectiveBase + semi;
+    if (midi < 21 || midi > 108) return;
     this.held.set(e.code, midi);
     this.onnoteon?.(midi, QWERTY_VELOCITY);
   };
 
   #keyup = (e) => {
+    if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+      this[e.code === 'ShiftLeft' ? 'shiftL' : 'shiftR'] = false;
+      this.onchange?.();
+      return;
+    }
     const midi = this.held.get(e.code);
     if (midi === undefined) return;
     this.held.delete(e.code);

@@ -67,7 +67,7 @@ function updateInputStatus() {
     modeHint.textContent = navigator.requestMIDIAccess
       ? 'no MIDI device found — your computer keys become the piano (labels on the keys)'
       : 'Web MIDI unavailable in this browser — your computer keys become the piano';
-    hudInput.textContent = `computer keys · Z/X shift octave (now ${input.octaveName})`;
+    hudInput.textContent = `computer keys · hold L/R shift = octave down/up · Z/X moves home (now ${input.octaveName})`;
   }
   if (judge) judge.fold = input.source === 'keyboard';
   refreshKeyLabels();
