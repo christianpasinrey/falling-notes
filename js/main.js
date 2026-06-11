@@ -1,7 +1,7 @@
 import { PianoSynth } from './synth.js';
 import { Sequencer } from './sequencer.js';
 import { PIECES } from './pieces/index.js';
-import { loadCatalog, loadCatalogPiece } from './catalog.js';
+import { loadCatalog, loadCatalogPiece, buildPieceFromMidi } from './catalog.js';
 import { NoteInput } from './input.js';
 import { Judge } from './judge.js';
 
@@ -163,6 +163,12 @@ async function start(index) {
       seq.notes.map(([midi, beat]) => ({ midi, start: beat * seq.spb })),
       { fold: input.source === 'keyboard' }
     );
+    let lo = 108, hi = 21;
+    for (const [midi] of seq.notes) {
+      if (midi < lo) lo = midi;
+      if (midi > hi) hi = midi;
+    }
+    input.fitTo(lo, hi);
     input.attach();
     hudScore.textContent = '0';
     hudCombo.textContent = '';
@@ -274,6 +280,32 @@ function renderExplorer(query) {
     shownItems.length > cap
       ? `showing ${cap} of ${shownItems.length} pieces — keep typing to narrow down`
       : `${shownItems.length} ${shownItems.length === 1 ? 'piece' : 'pieces'}`;
+}
+
+// — open your own MIDI: file picker + drop anywhere; nothing leaves the browser —
+const midiFile = document.getElementById('midi-file');
+document.getElementById('open-midi-btn').addEventListener('click', () => midiFile.click());
+midiFile.addEventListener('change', () => {
+  loadLocalMidi(midiFile.files[0]);
+  midiFile.value = ''; // so picking the same file again still fires change
+});
+window.addEventListener('dragover', (e) => e.preventDefault());
+window.addEventListener('drop', (e) => {
+  e.preventDefault();
+  const file = [...e.dataTransfer.files].find((f) => /\.(mid|midi|kar)$/i.test(f.name));
+  if (file) loadLocalMidi(file);
+});
+
+async function loadLocalMidi(file) {
+  if (!file) return;
+  const buf = await file.arrayBuffer();
+  const title = file.name.replace(/\.(mid|midi|kar)$/i, '').replace(/[_-]+/g, ' ');
+  const idSeed = [...file.name].reduce((a, c) => a + c.charCodeAt(0), 0);
+  playlist = [{
+    label: title,
+    load: async () => buildPieceFromMidi(buf, { idSeed, title, composer: 'your file', mood: 'yours' }),
+  }];
+  start(0);
 }
 
 window.addEventListener('keydown', (e) => {

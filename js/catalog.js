@@ -37,6 +37,23 @@ export async function loadCatalogPiece(item) {
     if (!r.ok) throw new Error('HTTP ' + r.status);
     return r.arrayBuffer();
   });
+  const piece = buildPieceFromMidi(buf, {
+    id: 'mutopia-' + item.file,
+    idSeed: item.entry.id,
+    title: item.label,
+    composer: item.entry.composer,
+    mood: (item.entry.style || 'classical').toLowerCase(),
+    marking: item.entry.instruments + (item.entry.license !== 'Public Domain' ? ` · ${shortLicense(item.entry.license)}` : ''),
+    instruments: item.entry.instruments,
+  });
+  pieceCache.set(key, piece);
+  if (pieceCache.size > 24) pieceCache.delete(pieceCache.keys().next().value);
+  return piece;
+}
+
+/** Turn any Standard MIDI File into a playable piece — catalog entries and
+ *  user-supplied local files alike. Nothing ever leaves the browser. */
+export function buildPieceFromMidi(buf, { id, idSeed = 0, title = 'untitled', composer = '', mood = 'midi', marking = '', instruments = '' } = {}) {
   const { notes, duration, tracks } = parseMidi(buf);
 
   // voice each track; first two note-bearing tracks get the R/L color pair
@@ -44,7 +61,7 @@ export async function loadCatalogPiece(item) {
   const handByTrack = {}, patchByTrack = {};
   noteTracks.forEach((t, rank) => {
     handByTrack[t.i] = rank % 2 === 0 ? 'R' : 'L';
-    patchByTrack[t.i] = classifyPatch(t.name, t.program, item.entry.instruments);
+    patchByTrack[t.i] = classifyPatch(t.name, t.program, instruments);
   });
 
   // pick the visual deck from the dominant instrument family
@@ -57,14 +74,14 @@ export async function loadCatalogPiece(item) {
   }
   const deck = Object.entries(famCount).sort((a, b) => b[1] - a[1])[0][0];
 
-  const hue = (item.entry.id * 137.508) % 360;
+  const hue = (idSeed * 137.508) % 360;
   const hue2 = (hue + 150) % 360;
-  const piece = {
-    id: 'mutopia-' + item.file,
-    mood: (item.entry.style || 'classical').toLowerCase(),
-    title: item.label,
-    composer: `${item.entry.composer}`,
-    marking: item.entry.instruments + (item.entry.license !== 'Public Domain' ? ` · ${shortLicense(item.entry.license)}` : ''),
+  return {
+    id: id || 'midi-' + title,
+    mood,
+    title,
+    composer,
+    marking,
     duration: fmtDur(duration),
     bpm: 60, // beat = second; timing resolved through the MIDI tempo map
     colors: {
@@ -76,9 +93,6 @@ export async function loadCatalogPiece(item) {
     notes: notes.map((n) => [n.midi, n.start, n.dur, handByTrack[n.track] || 'L', n.vel, patchByTrack[n.track] || 'piano']),
     totalBeats: duration,
   };
-  pieceCache.set(key, piece);
-  if (pieceCache.size > 24) pieceCache.delete(pieceCache.keys().next().value);
-  return piece;
 }
 
 const PATCH_KEYWORDS = [

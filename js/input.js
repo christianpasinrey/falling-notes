@@ -86,6 +86,22 @@ export class NoteInput {
     return m;
   }
 
+  /**
+   * Pick the home octave so the piece's range fits inside the reachable
+   * window [base-24, base+52]. Prefers C3 when the piece allows it; for
+   * ranges wider than the window, centres on the piece instead.
+   */
+  fitTo(minMidi, maxMidi) {
+    const lo = maxMidi - 28 - SHIFT_OCTAVES; // base ≥ lo reaches the piece's top
+    const hi = minMidi + SHIFT_OCTAVES; // base ≤ hi reaches its bottom
+    const target = lo <= hi ? Math.min(Math.max(48, lo), hi) : (minMidi + maxMidi) / 2 - 14;
+    const base = Math.min(Math.max(Math.round(target / 12) * 12, 24), 72);
+    if (base !== this.baseMidi) {
+      this.baseMidi = base;
+      this.onchange?.();
+    }
+  }
+
   /** Request Web MIDI once (prompts for permission); safe to re-call. */
   async enableMidi() {
     if (this.access !== undefined) return;
