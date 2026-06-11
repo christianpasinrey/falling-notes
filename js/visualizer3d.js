@@ -27,6 +27,8 @@ export class Visualizer3D {
 
     this.notes = [];
     this.live = new Map(); // note -> mesh
+    this.trails = new Map(); // playground: midi -> live trail still being held
+    this.trailMeshes = new Map(); // trail note -> mesh (held + departing)
     this.pool = [];
     this.spb = 1;
     this.lastT = -4;
@@ -194,8 +196,46 @@ export class Visualizer3D {
   reset() {
     for (const [, mesh] of this.live) this.#release(mesh);
     this.live.clear();
+    for (const [, mesh] of this.trailMeshes) this.#release(mesh);
+    this.trailMeshes.clear();
+    this.trails.clear();
     this.scanFrom = 0;
     this.lastT = -4;
+  }
+
+  // ---------- playground trails ----------
+  // Listening, the music comes toward you; playing, it leaves you: a note is
+  // born on the key, grows while held, and on release departs toward the
+  // horizon until the fog takes it.
+
+  liveTrailStart(midi, vel = 0.8) {
+    if (this.trails.has(midi)) this.liveTrailEnd(midi);
+    const n = { midi, start: this.lastT, end: null, vel, hand: 'R' };
+    this.trails.set(midi, n);
+    this.trailMeshes.set(n, this.#acquire(n));
+  }
+
+  liveTrailEnd(midi) {
+    const n = this.trails.get(midi);
+    if (n) {
+      n.end = this.lastT;
+      this.trails.delete(midi);
+    }
+  }
+
+  #updateTrails(t) {
+    for (const [n, mesh] of this.trailMeshes) {
+      const zTail = -(t - n.start) * SPEED; // far end, always receding
+      const zHead = n.end == null ? 0 : -(t - n.end) * SPEED;
+      const len = Math.max(zHead - zTail, 0.15);
+      mesh.scale.z = len;
+      mesh.position.z = zHead - len / 2 - 0.1;
+      mesh.material = n.end == null ? this.noteMats.Rhot : this.noteMats.R;
+      if (zHead < -HORIZON) {
+        this.#release(mesh);
+        this.trailMeshes.delete(n);
+      }
+    }
   }
 
   // ---------- play-mode input ----------
@@ -270,6 +310,7 @@ export class Visualizer3D {
 
     this.#updateStars(dt);
     this.#updateNotes(t);
+    this.#updateTrails(t);
     this.#updateKeys(t, dt);
     this.#updateParticles(dt);
 

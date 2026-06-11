@@ -68,8 +68,13 @@ export function initPlayground() {
 function handleUserNote(type, midi, vel) {
   if (type === 'on') {
     app.viz.hitBurst(midi, 'good'); // every press sparkles in free play
+    // playing is the mirror of listening: the note is born on the key and
+    // departs toward the horizon while you hold it
+    app.viz.liveTrailStart?.(midi, vel);
     if (recording) openNotes.set(midi, { t: app.synth.now - recStart, vel });
-  } else if (recording) {
+  } else {
+    app.viz.liveTrailEnd?.(midi);
+    if (!recording) return;
     const o = openNotes.get(midi);
     if (!o) return;
     openNotes.delete(midi);
