@@ -18,19 +18,16 @@
     <h1>Falling <span class="accent">Notes</span></h1>
     <p class="subtitle">nine featured pieces · a library of 2124</p>
     <div id="modes" role="radiogroup" aria-label="Mode">
-      <button id="mode-listen" class="mode-btn on" role="radio" aria-checked="true">
-        <strong>✧ listen</strong>
-        <span>sit back — the piano plays itself</span>
-      </button>
-      <button id="mode-play" class="mode-btn" role="radio" aria-checked="false">
-        <strong>♪ play it yourself</strong>
-        <span>the notes fall silent — you play them</span>
-      </button>
+      <button class="mode-btn on" data-mode="listen" role="radio" aria-checked="true">✧ listen</button>
+      <button class="mode-btn" data-mode="play" role="radio" aria-checked="false">♪ play</button>
+      <button class="mode-btn" data-mode="practice" role="radio" aria-checked="false">❋ practice</button>
     </div>
-    <p id="mode-hint" hidden></p>
+    <p id="mode-hint"></p>
     <div id="pieces" role="list"></div>
-    <button id="explore-btn">✦ explore the full Mutopia library — 2,100+ pieces</button>
-    <button id="open-midi-btn">♬ open your own MIDI file — plays right here, never uploaded</button>
+    <div id="library-actions">
+      <button id="explore-btn">✦ Mutopia library — 2,100+ pieces</button>
+      <button id="open-midi-btn">♬ open your own MIDI file</button>
+    </div>
     <input id="midi-file" type="file" accept=".mid,.midi,audio/midi" hidden />
     <div id="explorer" hidden>
       <div class="ex-head">
@@ -51,7 +48,7 @@
         <p class="tribute-sign">Thank you, keepers of the score. ♪</p>
       </blockquote>
     </div>
-    <p class="hint">space — pause · r — restart · ← → — prev / next · esc — back</p>
+    <p class="hint">space — pause · ← → — prev / next · esc — menu · drop a .mid file anywhere</p>
     <p class="credit">music engraved with love by the volunteers of the
       <a href="https://www.mutopiaproject.org/" target="_blank" rel="noopener">Mutopia Project</a></p>
   </div>
@@ -79,6 +76,10 @@
     <button id="btn-next" aria-label="Next piece" title="next (→)">
       <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M16 6h2v12h-2zM6 18l8.5-6L6 6z" fill="currentColor"/></svg>
     </button>
+    <span class="ctl-sep" aria-hidden="true"></span>
+    <button class="ctl-mode" data-mode="listen" title="listen — the piano plays itself">✧</button>
+    <button class="ctl-mode" data-mode="play" title="play — you play it, scored">♪</button>
+    <button class="ctl-mode" data-mode="practice" title="practice — waits for your key">❋</button>
   </nav>
 
   <script type="importmap">

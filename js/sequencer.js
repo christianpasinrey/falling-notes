@@ -37,6 +37,11 @@ export class Sequencer {
     this.timer = null;
   }
 
+  /** Practice mode: pin song-time at t by sliding the clock origin forward. */
+  holdAt(t) {
+    this.startCtxTime += this.songTime - t;
+  }
+
   #run() {
     const notes = this.notes;
     this.timer = setInterval(() => {

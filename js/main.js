@@ -34,7 +34,8 @@ let paused = false;
 const input = new NoteInput();
 const liveInput = new Map(); // midi -> {vel}, shared with the visualizer
 viz.setLiveInput(liveInput);
-let mode = localStorage.getItem('fn-mode') === 'play' ? 'play' : 'listen';
+let mode = localStorage.getItem('fn-mode');
+if (!['listen', 'play', 'practice'].includes(mode)) mode = 'listen';
 let judge = null;
 
 const playhud = document.getElementById('playhud');
@@ -43,43 +44,49 @@ const hudScore = document.getElementById('hud-score');
 const hudCombo = document.getElementById('hud-combo');
 const hudInput = document.getElementById('hud-input');
 const modeHint = document.getElementById('mode-hint');
-const modeBtns = {
-  listen: document.getElementById('mode-listen'),
-  play: document.getElementById('mode-play'),
+const modeButtons = document.querySelectorAll('[data-mode]');
+
+const MODE_HINTS = {
+  listen: 'sit back — the piano plays itself',
+  play: 'the piece falls silent and you play it, scored',
+  practice: 'the piece waits for the correct key before moving on',
 };
 
-function setMode(m) {
+function setMode(m, { restart = false } = {}) {
   mode = m;
   localStorage.setItem('fn-mode', m);
-  for (const [name, btn] of Object.entries(modeBtns)) {
-    btn.classList.toggle('on', name === m);
-    btn.setAttribute('aria-checked', String(name === m));
+  for (const btn of modeButtons) {
+    const on = btn.dataset.mode === m;
+    btn.classList.toggle('on', on);
+    if (btn.getAttribute('role') === 'radio') btn.setAttribute('aria-checked', String(on));
   }
-  modeHint.hidden = m !== 'play';
-  if (m === 'play') input.enableMidi().then(updateInputStatus);
+  if (m !== 'listen') input.enableMidi().then(updateInputStatus);
+  updateModeHint();
+  if (restart && seq && document.body.classList.contains('playing')) start(currentIndex);
+}
+
+function updateModeHint() {
+  let text = MODE_HINTS[mode];
+  if (mode !== 'listen')
+    text += input.midiName ? ` · MIDI: ${input.midiName}` : ' · computer keys, labelled on the piano';
+  modeHint.textContent = text;
 }
 
 function updateInputStatus() {
-  if (input.midiName) {
-    modeHint.textContent = `MIDI keyboard connected — ${input.midiName}`;
-    hudInput.textContent = `MIDI · ${input.midiName}`;
-  } else {
-    modeHint.textContent = navigator.requestMIDIAccess
-      ? 'no MIDI device found — your computer keys become the piano (labels on the keys)'
-      : 'Web MIDI unavailable in this browser — your computer keys become the piano';
-    hudInput.textContent = `computer keys · hold L/R shift = 2 octaves down/up · ↑/↓ moves home (Z = ${input.octaveName})`;
-  }
+  hudInput.textContent = input.midiName
+    ? `MIDI · ${input.midiName}`
+    : `computer keys · hold L/R shift = 2 octaves down/up · ↑/↓ moves home (Z = ${input.octaveName})`;
   if (judge) judge.fold = input.source === 'keyboard';
+  updateModeHint();
   refreshKeyLabels();
 }
 
 function refreshKeyLabels() {
   const playing = document.body.classList.contains('playing');
-  viz.setKeyLabels(mode === 'play' && playing && input.source === 'keyboard' ? input.labelMap() : null);
+  viz.setKeyLabels(mode !== 'listen' && playing && input.source === 'keyboard' ? input.labelMap() : null);
 }
 
-modeBtns.listen.addEventListener('click', () => setMode('listen'));
-modeBtns.play.addEventListener('click', () => setMode('play'));
+for (const btn of modeButtons) btn.addEventListener('click', () => setMode(btn.dataset.mode, { restart: true }));
 setMode(mode);
 
 input.onnoteon = (midi, vel) => {
@@ -95,8 +102,22 @@ input.onnoteoff = (midi) => {
 input.onpedal = (down) => synth?.setPedal(down);
 input.onchange = updateInputStatus;
 
+const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const noteName = (m) => NOTE_NAMES[m % 12] + (Math.floor(m / 12) - 1);
+
+let shownGate = '';
+function showWaiting(gate) {
+  const key = gate.start + ':' + gate.midis.join();
+  if (key === shownGate) return;
+  shownGate = key;
+  judgeAnim?.cancel();
+  hudJudge.className = 'wait';
+  hudJudge.textContent = '⏸ ' + gate.midis.map(noteName).join(' + ');
+}
+
 let judgeAnim = null;
 function showJudgement(result) {
+  shownGate = '';
   hudJudge.textContent = result === 'extra' ? '·' : result;
   hudJudge.className = result;
   judgeAnim?.cancel();
@@ -152,13 +173,14 @@ async function start(index) {
   // A fresh context every run keeps restart trivial and leak-free.
   if (synth) synth.ctx.close();
   synth = new PianoSynth();
-  seq = new Sequencer(synth, piece, { silent: mode === 'play' });
+  seq = new Sequencer(synth, piece, { silent: mode !== 'listen' });
   seq.onended = () => start(currentIndex + 1); // autoplay: on to the next
   viz.setPiece(piece);
   setPaused(false);
 
   liveInput.clear();
-  if (mode === 'play') {
+  shownGate = '';
+  if (mode !== 'listen') {
     judge = new Judge(
       seq.notes.map(([midi, beat]) => ({ midi, start: beat * seq.spb })),
       { fold: input.source === 'keyboard' }
@@ -320,8 +342,8 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'Space') {
     e.preventDefault();
     togglePause();
-  } else if ((e.key === 'r' || e.key === 'R') && e.target === document.body && mode !== 'play') {
-    start(currentIndex); // in play-mode R is a note (F), not restart
+  } else if ((e.key === 'r' || e.key === 'R') && e.target === document.body && mode === 'listen') {
+    start(currentIndex); // outside listen-mode R is a note (F), not restart
   } else if (e.key === 'ArrowRight') {
     start(currentIndex + 1);
   } else if (e.key === 'ArrowLeft') {
@@ -332,8 +354,18 @@ window.addEventListener('keydown', (e) => {
 });
 
 function frame() {
+  if (judge && seq && !paused) {
+    if (mode === 'practice') {
+      // hold the piece at the next unplayed note (or chord) until it lands
+      const gate = judge.nextGate();
+      if (gate && seq.songTime > gate.start) {
+        seq.holdAt(gate.start);
+        showWaiting(gate);
+      }
+    }
+    if (judge.update(seq.songTime)) showJudgement('miss');
+  }
   const t = seq ? seq.songTime : -4;
-  if (judge && seq && !paused && judge.update(t)) showJudgement('miss');
   viz.render(t, seq && t > 0 ? t / seq.totalSeconds : 0);
   requestAnimationFrame(frame);
 }

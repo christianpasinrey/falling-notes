@@ -62,6 +62,22 @@ export class Judge {
     return missed;
   }
 
+  /**
+   * Practice gate: the earliest unhit note, plus every unhit note struck
+   * within the same 50ms (a chord). Null once the piece is fully played.
+   */
+  nextGate() {
+    for (let i = this.sweep; i < this.notes.length; i++) {
+      if (this.notes[i].hit) continue;
+      const start = this.notes[i].start;
+      const midis = [];
+      for (let j = i; j < this.notes.length && this.notes[j].start - start < 0.05; j++)
+        if (!this.notes[j].hit) midis.push(this.notes[j].midi);
+      return { start, midis };
+    }
+    return null;
+  }
+
   /** 0..1 share of judged notes that were hit. */
   get accuracy() {
     const judged = this.counts.perfect + this.counts.good + this.counts.miss;
