@@ -4,14 +4,26 @@
 // note numbers.
 
 // Physical key positions (KeyboardEvent.code), so the piano shape survives
-// any keyboard layout: home row = white keys, the row above = black keys.
+// any keyboard layout. Two full manuals, the classic DAW mapping: bottom row
+// = lower-octave whites with blacks on the home row, Q-row = upper whites
+// with blacks on the digits. Insertion order matters: where the manuals
+// overlap (C+1..E+1), whichever code comes first supplies the on-key label.
 const KEY_TO_SEMITONE = new Map([
-  ['KeyA', 0], ['KeyW', 1], ['KeyS', 2], ['KeyE', 3], ['KeyD', 4],
-  ['KeyF', 5], ['KeyT', 6], ['KeyG', 7], ['KeyY', 8], ['KeyH', 9],
-  ['KeyU', 10], ['KeyJ', 11], ['KeyK', 12], ['KeyO', 13], ['KeyL', 14],
-  ['KeyP', 15], ['Semicolon', 16],
+  // lower manual
+  ['KeyZ', 0], ['KeyS', 1], ['KeyX', 2], ['KeyD', 3], ['KeyC', 4],
+  ['KeyV', 5], ['KeyG', 6], ['KeyB', 7], ['KeyH', 8], ['KeyN', 9],
+  ['KeyJ', 10], ['KeyM', 11],
+  // upper manual
+  ['KeyQ', 12], ['Digit2', 13], ['KeyW', 14], ['Digit3', 15], ['KeyE', 16],
+  ['KeyR', 17], ['Digit5', 18], ['KeyT', 19], ['Digit6', 20], ['KeyY', 21],
+  ['Digit7', 22], ['KeyU', 23], ['KeyI', 24], ['Digit9', 25], ['KeyO', 26],
+  ['Digit0', 27], ['KeyP', 28],
+  // lower-manual tail, duplicates of Q..E (after them, so Q-row labels win)
+  ['Comma', 12], ['KeyL', 13], ['Period', 14], ['Semicolon', 15], ['Slash', 16],
 ]);
+const SHIFT_OCTAVES = 24; // a held shift jumps two octaves: the plain span is ~2.4
 const QWERTY_VELOCITY = 0.8;
+const PUNCT_LABEL = { Comma: ',', Period: '.', Slash: '-', Semicolon: ';' };
 
 export class NoteInput {
   constructor() {
@@ -19,18 +31,18 @@ export class NoteInput {
     this.onnoteoff = null; // (midi)
     this.onpedal = null; // (down)
     this.onchange = null; // source or octave changed
-    this.baseMidi = 60; // the QWERTY 'A' key plays middle C
+    this.baseMidi = 48; // the QWERTY 'Z' key plays C3; Q continues at C4
     this.midiName = null; // connected MIDI device name, if any
     this.attached = false;
     this.held = new Map(); // code -> sounding midi, so octave shifts never strand a note
-    this.shiftL = false; // held left shift reaches one octave down…
-    this.shiftR = false; // …held right shift one octave up
+    this.shiftL = false; // held left shift reaches two octaves down…
+    this.shiftR = false; // …held right shift two octaves up
 
     // Printed key caps for on-screen labels. KeyboardLayoutMap (Chromium)
     // gives the real legend — Ñ instead of ';' on a Spanish keyboard.
     this.labels = new Map();
     for (const code of KEY_TO_SEMITONE.keys())
-      this.labels.set(code, code === 'Semicolon' ? ';' : code.replace('Key', ''));
+      this.labels.set(code, PUNCT_LABEL[code] || code.replace(/^(Key|Digit)/, ''));
     navigator.keyboard?.getLayoutMap?.().then((map) => {
       for (const code of KEY_TO_SEMITONE.keys()) {
         const ch = map.get(code);
@@ -44,20 +56,20 @@ export class NoteInput {
     return this.midiName ? 'midi' : 'keyboard';
   }
 
-  /** Octave the QWERTY 'A' key plays right now, shifts included. */
+  /** Note the QWERTY 'Z' key plays right now, shifts included. */
   get effectiveBase() {
-    return this.baseMidi + (this.shiftL ? -12 : 0) + (this.shiftR ? 12 : 0);
+    return this.baseMidi + (this.shiftL ? -SHIFT_OCTAVES : 0) + (this.shiftR ? SHIFT_OCTAVES : 0);
   }
 
-  /** "C4" for the octave the QWERTY 'A' key currently plays. */
+  /** "C3" for the octave the QWERTY 'Z' key currently plays. */
   get octaveName() {
     return 'C' + (this.effectiveBase / 12 - 1);
   }
 
   /**
    * midi -> {ch, mod} for every key the QWERTY layout can reach from home:
-   * the centre octaves plain, one octave left via held left shift (mod 'L'),
-   * one octave right via held right shift (mod 'R'). Plain wins overlaps.
+   * the centre span plain, two octaves left via held left shift (mod 'L'),
+   * two octaves right via held right shift (mod 'R'). Plain wins overlaps.
    * Keyed to the home octave so the map stays put while shifts are held.
    */
   labelMap() {
@@ -69,8 +81,8 @@ export class NoteInput {
       }
     };
     zone(0, null);
-    zone(-12, 'L');
-    zone(12, 'R');
+    zone(-SHIFT_OCTAVES, 'L');
+    zone(SHIFT_OCTAVES, 'R');
     return m;
   }
 
@@ -132,8 +144,8 @@ export class NoteInput {
       this.onchange?.();
       return;
     }
-    if (e.code === 'KeyZ' || e.code === 'KeyX') {
-      const next = Math.min(Math.max(this.baseMidi + (e.code === 'KeyZ' ? -12 : 12), 24), 84);
+    if (e.code === 'ArrowUp' || e.code === 'ArrowDown') {
+      const next = Math.min(Math.max(this.baseMidi + (e.code === 'ArrowDown' ? -12 : 12), 24), 72);
       if (next !== this.baseMidi) {
         this.baseMidi = next;
         this.onchange?.();

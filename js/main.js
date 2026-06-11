@@ -67,7 +67,7 @@ function updateInputStatus() {
     modeHint.textContent = navigator.requestMIDIAccess
       ? 'no MIDI device found — your computer keys become the piano (labels on the keys)'
       : 'Web MIDI unavailable in this browser — your computer keys become the piano';
-    hudInput.textContent = `computer keys · hold L/R shift = octave down/up · Z/X moves home (now ${input.octaveName})`;
+    hudInput.textContent = `computer keys · hold L/R shift = 2 octaves down/up · ↑/↓ moves home (Z = ${input.octaveName})`;
   }
   if (judge) judge.fold = input.source === 'keyboard';
   refreshKeyLabels();
@@ -288,8 +288,8 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'Space') {
     e.preventDefault();
     togglePause();
-  } else if ((e.key === 'r' || e.key === 'R') && e.target === document.body) {
-    start(currentIndex);
+  } else if ((e.key === 'r' || e.key === 'R') && e.target === document.body && mode !== 'play') {
+    start(currentIndex); // in play-mode R is a note (F), not restart
   } else if (e.key === 'ArrowRight') {
     start(currentIndex + 1);
   } else if (e.key === 'ArrowLeft') {
