@@ -33,6 +33,7 @@ export function initPlayMode() {
     if (!app.synth || app.paused) return;
     app.synth.noteOn(midi, vel);
     liveInput.set(midi, { vel });
+    app.onUserNote?.('on', midi, vel);
     if (app.judge && app.seq) {
       const result = app.judge.noteOn(midi, app.seq.songTime);
       showJudgement(result);
@@ -42,6 +43,7 @@ export function initPlayMode() {
   input.onnoteoff = (midi) => {
     app.synth?.noteOff(midi);
     liveInput.delete(midi);
+    app.onUserNote?.('off', midi);
   };
   input.onpedal = (down) => app.synth?.setPedal(down);
   input.onchange = updateInputStatus;
@@ -74,9 +76,8 @@ function updateInputStatus() {
 }
 
 export function refreshKeyLabels() {
-  app.viz.setKeyLabels(
-    app.mode !== 'listen' && isPlaying() && input.source === 'keyboard' ? input.labelMap() : null
-  );
+  const live = app.mode !== 'listen' || app.piece?.playground;
+  app.viz.setKeyLabels(live && isPlaying() && input.source === 'keyboard' ? input.labelMap() : null);
 }
 
 /** Per piece start, once app.seq exists: build (or drop) the judging round. */
@@ -84,6 +85,13 @@ export function setupRound(playerVoice) {
   liveInput.clear();
   shownGate = '';
   app.viz.setTargets(null);
+  if (app.piece?.playground) {
+    // free play: keys always live, nothing judged
+    app.judge = null;
+    input.attach();
+    playhud.hidden = true;
+    return;
+  }
   if (app.mode !== 'listen') {
     // you are judged on (and octave-fitted to) the voice you chose to play
     const mine = app.seq.notes.filter((n) => playerVoice === 'all' || noteVoice(n) === playerVoice);

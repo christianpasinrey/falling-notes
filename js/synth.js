@@ -86,6 +86,7 @@ export class PianoSynth {
     this.dry.connect(comp);
     this.wet.connect(comp);
     comp.connect(this.ctx.destination);
+    this.comp = comp; // recording taps the full mix here
 
     this.waves = {};
     for (const [name, p] of Object.entries(PATCHES)) {
@@ -101,6 +102,15 @@ export class PianoSynth {
 
   get now() {
     return this.ctx.currentTime;
+  }
+
+  /** Everything that sounds (piano, drums, metronome), as a MediaStream. */
+  captureStream() {
+    if (!this.recDest) {
+      this.recDest = this.ctx.createMediaStreamDestination();
+      this.comp.connect(this.recDest);
+    }
+    return this.recDest.stream;
   }
 
   resume() {

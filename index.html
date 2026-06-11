@@ -27,6 +27,7 @@
     <div id="library-actions">
       <button id="explore-btn">✦ Mutopia library — 2,100+ pieces</button>
       <button id="open-midi-btn">♬ open your own MIDI file</button>
+      <button id="playground-btn">✎ playground — free play, record &amp; share</button>
     </div>
     <input id="midi-file" type="file" accept=".mid,.midi,audio/midi" multiple hidden />
     <div id="explorer" hidden>
@@ -111,6 +112,14 @@
   </nav>
 
   <div id="voices-panel" hidden></div>
+
+  <div id="pg-bar" hidden>
+    <button id="pg-record">⏺ record</button>
+    <button id="pg-stop" hidden>⏹ stop</button>
+    <a id="pg-download" hidden>⬇ audio</a>
+    <button id="pg-share" hidden>🔗 copy share link</button>
+    <span id="pg-status"></span>
+  </div>
 
   <script type="importmap">
     {

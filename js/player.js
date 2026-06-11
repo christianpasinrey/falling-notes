@@ -35,8 +35,8 @@ export function initPlayer() {
     if (e.code === 'Space') {
       e.preventDefault();
       togglePause();
-    } else if ((e.key === 'r' || e.key === 'R') && e.target === document.body && app.mode === 'listen') {
-      start(currentIndex); // outside listen-mode R is a note (F), not restart
+    } else if ((e.key === 'r' || e.key === 'R') && e.target === document.body && app.mode === 'listen' && !app.piece?.playground) {
+      start(currentIndex); // when keys are live, R is a note (F), not restart
     } else if (e.key === 'ArrowRight') {
       start(currentIndex + 1);
     } else if (e.key === 'ArrowLeft') {
@@ -65,6 +65,7 @@ async function start(index) {
     return;
   }
   if (token !== startToken) return; // a newer start superseded this one
+  app.onPieceEnd?.(); // leaving whatever was on (recording cleanup etc.)
 
   // the speed control scales the whole clock — audio, visuals and judging
   // all derive from bpm, so one scaled copy adjusts everything coherently
@@ -97,11 +98,13 @@ async function start(index) {
     overlay.classList.add('hidden');
     document.body.classList.add('playing');
     refreshKeyLabels();
+    app.onPieceStart?.(piece);
   });
 }
 
 function backToMenu() {
   startToken++;
+  app.onPieceEnd?.();
   app.seq?.stop();
   if (app.synth) app.synth.ctx.close();
   app.synth = null;

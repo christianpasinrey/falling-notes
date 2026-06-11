@@ -38,7 +38,11 @@ export class Sequencer {
     this.metronome = false;
     this.drums = null;
     this.drumKit = null; // DRUM_KITS key, or null for the synthesized kit
-    this.beats = piece.beatTimes || Array.from({ length: Math.ceil(piece.totalBeats) + 1 }, (_, i) => i);
+    // integer-grid fallback is capped: the playground's endless piece would
+    // otherwise allocate millions of beats
+    this.beats =
+      piece.beatTimes ||
+      Array.from({ length: Math.min(Math.ceil(piece.totalBeats) + 1, 100000) }, (_, i) => i);
     this.beatsPerBar = piece.beatsPerBar || 0;
     this.beatIndex = 0;
     // The look-ahead walk requires chronological order; piece data may be

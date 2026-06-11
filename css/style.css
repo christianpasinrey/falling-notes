@@ -357,6 +357,50 @@ html, body {
   letter-spacing: 0.1em;
 }
 
+/* ---- playground bar ---- */
+#pg-bar[hidden] { display: none; }
+#pg-bar {
+  position: fixed;
+  top: 3.4rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+  background: rgba(5, 8, 16, 0.75);
+  backdrop-filter: blur(6px);
+  font-size: 0.92rem;
+}
+#pg-bar button,
+#pg-bar a {
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 0.92rem;
+  cursor: pointer;
+  text-decoration: none;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  transition: background 0.25s, color 0.25s;
+}
+#pg-bar button:hover,
+#pg-bar a:hover { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+#pg-status {
+  font-style: italic;
+  font-size: 0.82rem;
+  color: var(--ink-dim);
+  max-width: 24rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.shared-card { outline: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); }
+
 /* ---- playing caption ---- */
 #caption {
   position: fixed;

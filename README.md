@@ -48,6 +48,15 @@ into a single piece — each file becomes a voice, aligned at t=0, so
 split-track songs work naturally (and mixing unrelated songs is your own
 beautiful problem).
 
+## Playground
+
+Free play: no falling notes, just the piano (and any groove/tempo you pick)
+responding to what you press. Hit **⏺ record** and when you stop you can
+**download the audio** of your take or **copy a share link** — the notes are
+compressed into the URL itself, so there is no upload and no server: whoever
+opens the link gets your recording as a playable piece, falling notes and all,
+ready to listen to or learn in practice mode.
+
 ## The library
 
 Nine featured pieces — Bach, Satie, Beethoven, Chopin, Debussy, Vivaldi and an

@@ -12,6 +12,7 @@ import { initVoices } from './voices.js';
 import { initRhythm } from './rhythm.js';
 import { initPlayer } from './player.js';
 import { initLibrary } from './library.js';
+import { initPlayground } from './playground.js';
 
 // Prefer the WebGL space journey; fall back to the 2D highway if WebGL or
 // the three.js CDN are unavailable.
@@ -31,3 +32,4 @@ initVoices();
 initRhythm();
 initPlayer();
 initLibrary();
+initPlayground();
