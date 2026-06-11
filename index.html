@@ -17,6 +17,11 @@
   <div id="overlay">
     <h1>Falling <span class="accent">Notes</span></h1>
     <p class="subtitle">nine featured pieces · a library of 2124</p>
+    <div id="modes" role="radiogroup" aria-label="Mode">
+      <button id="mode-listen" class="mode-btn on" role="radio" aria-checked="true">✧ listen</button>
+      <button id="mode-play" class="mode-btn" role="radio" aria-checked="false">♪ play it yourself</button>
+    </div>
+    <p id="mode-hint" hidden></p>
     <div id="pieces" role="list"></div>
     <button id="explore-btn">✦ explore the full Mutopia library — 2,100+ pieces</button>
     <div id="explorer" hidden>
@@ -41,6 +46,13 @@
     <p class="hint">space — pause · r — restart · ← → — prev / next · esc — back</p>
     <p class="credit">music engraved with love by the volunteers of the
       <a href="https://www.mutopiaproject.org/" target="_blank" rel="noopener">Mutopia Project</a></p>
+  </div>
+
+  <div id="playhud" hidden>
+    <div id="hud-judge"></div>
+    <div id="hud-score">0</div>
+    <div id="hud-combo"></div>
+    <div id="hud-input"></div>
   </div>
 
   <footer id="caption">

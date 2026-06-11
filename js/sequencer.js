@@ -6,9 +6,10 @@ const TICK_MS = 25;
 const LEAD_IN_S = 2.4; // silence before the first note so bars fall into view
 
 export class Sequencer {
-  constructor(synth, piece) {
+  constructor(synth, piece, { silent = false } = {}) {
     this.synth = synth;
     this.piece = piece;
+    this.silent = silent; // play-mode: the clock and visuals run, the user supplies the sound
     // The look-ahead walk requires chronological order; piece data may be
     // authored voice-by-voice, so never assume it.
     this.notes = [...piece.notes].sort((a, b) => a[1] - b[1]);
@@ -45,7 +46,7 @@ export class Sequencer {
         const startS = startBeat * this.spb;
         if (startS > horizon) break;
         const when = this.startCtxTime + LEAD_IN_S + startS;
-        this.synth.playNote(midi, when, durBeats * this.spb, vel, patch || 'piano');
+        if (!this.silent) this.synth.playNote(midi, when, durBeats * this.spb, vel, patch || 'piano');
         this.nextIndex++;
       }
       if (this.nextIndex >= notes.length && this.songTime > this.totalSeconds + 3) {

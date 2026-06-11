@@ -2,6 +2,8 @@ import { PianoSynth } from './synth.js';
 import { Sequencer } from './sequencer.js';
 import { PIECES } from './pieces/index.js';
 import { loadCatalog, loadCatalogPiece } from './catalog.js';
+import { NoteInput } from './input.js';
+import { Judge } from './judge.js';
 
 const overlay = document.getElementById('overlay');
 const piecesEl = document.getElementById('pieces');
@@ -27,6 +29,84 @@ try {
 let synth = null;
 let seq = null;
 let paused = false;
+
+// — play-it-yourself mode —
+const input = new NoteInput();
+const liveInput = new Map(); // midi -> {vel}, shared with the visualizer
+viz.setLiveInput(liveInput);
+let mode = localStorage.getItem('fn-mode') === 'play' ? 'play' : 'listen';
+let judge = null;
+
+const playhud = document.getElementById('playhud');
+const hudJudge = document.getElementById('hud-judge');
+const hudScore = document.getElementById('hud-score');
+const hudCombo = document.getElementById('hud-combo');
+const hudInput = document.getElementById('hud-input');
+const modeHint = document.getElementById('mode-hint');
+const modeBtns = {
+  listen: document.getElementById('mode-listen'),
+  play: document.getElementById('mode-play'),
+};
+
+function setMode(m) {
+  mode = m;
+  localStorage.setItem('fn-mode', m);
+  for (const [name, btn] of Object.entries(modeBtns)) {
+    btn.classList.toggle('on', name === m);
+    btn.setAttribute('aria-checked', String(name === m));
+  }
+  modeHint.hidden = m !== 'play';
+  if (m === 'play') input.enableMidi().then(updateInputStatus);
+}
+
+function updateInputStatus() {
+  if (input.midiName) {
+    modeHint.textContent = `MIDI keyboard connected — ${input.midiName}`;
+    hudInput.textContent = `MIDI · ${input.midiName}`;
+  } else {
+    modeHint.textContent = navigator.requestMIDIAccess
+      ? 'no MIDI device found — your computer keys become the piano (labels on the keys)'
+      : 'Web MIDI unavailable in this browser — your computer keys become the piano';
+    hudInput.textContent = `computer keys · Z/X shift octave (now ${input.octaveName})`;
+  }
+  if (judge) judge.fold = input.source === 'keyboard';
+  refreshKeyLabels();
+}
+
+function refreshKeyLabels() {
+  const playing = document.body.classList.contains('playing');
+  viz.setKeyLabels(mode === 'play' && playing && input.source === 'keyboard' ? input.labelMap() : null);
+}
+
+modeBtns.listen.addEventListener('click', () => setMode('listen'));
+modeBtns.play.addEventListener('click', () => setMode('play'));
+setMode(mode);
+
+input.onnoteon = (midi, vel) => {
+  if (!synth || paused) return;
+  synth.noteOn(midi, vel);
+  liveInput.set(midi, { vel });
+  if (judge && seq) showJudgement(judge.noteOn(midi, seq.songTime));
+};
+input.onnoteoff = (midi) => {
+  synth?.noteOff(midi);
+  liveInput.delete(midi);
+};
+input.onpedal = (down) => synth?.setPedal(down);
+input.onchange = updateInputStatus;
+
+let judgeAnim = null;
+function showJudgement(result) {
+  hudJudge.textContent = result === 'extra' ? '·' : result;
+  hudJudge.className = result;
+  judgeAnim?.cancel();
+  judgeAnim = hudJudge.animate(
+    [{ opacity: 1, transform: 'scale(1.18)' }, { opacity: 1, transform: 'scale(1)', offset: 0.25 }, { opacity: 0 }],
+    { duration: 900, easing: 'ease-out', fill: 'forwards' }
+  );
+  hudScore.textContent = String(Math.round(judge.score));
+  hudCombo.textContent = judge.combo > 1 ? `×${judge.combo}` : '';
+}
 
 // A playlist is what prev/next/autoplay walk through: the featured nine, or
 // whatever slice of the Mutopia library the explorer currently shows.
@@ -72,10 +152,27 @@ async function start(index) {
   // A fresh context every run keeps restart trivial and leak-free.
   if (synth) synth.ctx.close();
   synth = new PianoSynth();
-  seq = new Sequencer(synth, piece);
+  seq = new Sequencer(synth, piece, { silent: mode === 'play' });
   seq.onended = () => start(currentIndex + 1); // autoplay: on to the next
   viz.setPiece(piece);
   setPaused(false);
+
+  liveInput.clear();
+  if (mode === 'play') {
+    judge = new Judge(
+      seq.notes.map(([midi, beat]) => ({ midi, start: beat * seq.spb })),
+      { fold: input.source === 'keyboard' }
+    );
+    input.attach();
+    hudScore.textContent = '0';
+    hudCombo.textContent = '';
+    hudJudge.textContent = '';
+    playhud.hidden = false;
+  } else {
+    judge = null;
+    input.detach();
+    playhud.hidden = true;
+  }
 
   document.documentElement.style.setProperty('--accent', piece.accent);
   document.documentElement.style.setProperty('--hand-r', piece.colors.R.body);
@@ -87,6 +184,7 @@ async function start(index) {
     seq.start();
     overlay.classList.add('hidden');
     document.body.classList.add('playing');
+    refreshKeyLabels();
   });
 }
 
@@ -96,6 +194,11 @@ function backToMenu() {
   if (synth) synth.ctx.close();
   synth = null;
   seq = null;
+  judge = null;
+  input.detach();
+  liveInput.clear();
+  viz.setKeyLabels(null);
+  playhud.hidden = true;
   setPaused(false);
   document.body.classList.remove('playing');
   overlay.classList.remove('hidden');
@@ -198,6 +301,7 @@ window.addEventListener('keydown', (e) => {
 
 function frame() {
   const t = seq ? seq.songTime : -4;
+  if (judge && seq && !paused && judge.update(t)) showJudgement('miss');
   viz.render(t, seq && t > 0 ? t / seq.totalSeconds : 0);
   requestAnimationFrame(frame);
 }

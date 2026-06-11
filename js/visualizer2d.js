@@ -10,6 +10,9 @@ const DEPTH = 0.55; // perspective rate: s = 1 / (1 + z * DEPTH)
 
 const GLYPHS = ['♪', '♫', '♩', '\u{1D11E}', '\u{1D122}'];
 
+// colour for keys the user presses in play-mode (no hand attached)
+const USER_COLORS = { core: '#f4f8ff', body: '#cfe0ff', glow: 'rgba(205, 224, 255, 0.55)' };
+
 export class Visualizer {
   constructor(canvas) {
     this.canvas = canvas;
@@ -18,6 +21,8 @@ export class Visualizer {
     this.spawned = new Set();
     this.notes = [];
     this.accent = '#6fb7ff';
+    this.liveInput = null; // midi -> {vel}: keys the user is holding right now
+    this.keyLabels = null; // midi -> key-cap letter, for QWERTY play-mode
     this.colors = {
       R: { core: '#bfe0ff', body: '#5aa9f4', glow: 'rgba(111, 183, 255, 0.55)' },
       L: { core: '#c2f5dd', body: '#2ec98e', glow: 'rgba(69, 220, 162, 0.5)' },
@@ -43,6 +48,16 @@ export class Visualizer {
   reset() {
     this.particles.length = 0;
     this.spawned.clear();
+  }
+
+  /** Share a live map of midi -> {vel} for keys the user is holding. */
+  setLiveInput(map) {
+    this.liveInput = map;
+  }
+
+  /** Paint a key-cap label on each mapped piano key (midi -> letter), or null to clear. */
+  setKeyLabels(labels) {
+    this.keyLabels = labels;
   }
 
   resize() {
@@ -108,6 +123,12 @@ export class Visualizer {
     }
     visible.sort((a, b) => (b.start - songTime) - (a.start - songTime));
     for (const n of visible) this.#drawNote(n, songTime);
+
+    // keys the user is physically holding override the scheduled lighting
+    if (this.liveInput) {
+      for (const [midi, v] of this.liveInput)
+        active.set(midi, { midi, hand: 'U', vel: v.vel ?? 0.8, start: songTime });
+    }
 
     this.#drawImpactGlow(active);
     this.#drawKeyboard(active);
@@ -179,7 +200,7 @@ export class Visualizer {
       const cx = key.x + key.w / 2;
       const r = key.w * 3.2;
       const g = ctx.createRadialGradient(cx, hitY, 0, cx, hitY, r);
-      const c = this.colors[n.hand];
+      const c = this.colors[n.hand] || USER_COLORS;
       g.addColorStop(0, c.glow);
       g.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.globalAlpha = 0.5 * n.vel + 0.2;
@@ -311,7 +332,7 @@ export class Visualizer {
       const lit = active.get(midi);
       const g = ctx.createLinearGradient(0, hitY, 0, hitY + kbH);
       if (lit) {
-        const c = this.colors[lit.hand];
+        const c = this.colors[lit.hand] || USER_COLORS;
         g.addColorStop(0, c.body);
         g.addColorStop(0.7, c.core);
         g.addColorStop(1, '#fff');
@@ -324,7 +345,7 @@ export class Visualizer {
       ctx.fillRect(k.x + 0.5, hitY, k.w - 1, kbH);
       if (lit) {
         ctx.save();
-        ctx.shadowColor = this.colors[lit.hand].glow;
+        ctx.shadowColor = (this.colors[lit.hand] || USER_COLORS).glow;
         ctx.shadowBlur = 18;
         ctx.fillRect(k.x + 0.5, hitY, k.w - 1, kbH);
         ctx.restore();
@@ -337,7 +358,7 @@ export class Visualizer {
       const lit = active.get(midi);
       const g = ctx.createLinearGradient(0, hitY, 0, hitY + bH);
       if (lit) {
-        const c = this.colors[lit.hand];
+        const c = this.colors[lit.hand] || USER_COLORS;
         g.addColorStop(0, c.body);
         g.addColorStop(1, c.core);
       } else {
@@ -349,6 +370,28 @@ export class Visualizer {
       ctx.beginPath();
       ctx.roundRect(k.x, hitY, k.w, bH, [0, 0, 3, 3]);
       ctx.fill();
+    }
+
+    // QWERTY play-mode: paint the computer key cap on its piano key
+    if (this.keyLabels) {
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const size = Math.max(10, Math.min(this.layout.whiteW * 0.55, 16));
+      ctx.font = `600 ${size}px system-ui, -apple-system, sans-serif`;
+      for (const [midi, ch] of this.keyLabels) {
+        const k = keys.get(midi);
+        if (!k || !ch) continue;
+        const cx = k.x + k.w / 2;
+        if (k.black) {
+          ctx.fillStyle = '#dfe6f2';
+          ctx.fillText(ch, cx, hitY + bH - size * 0.9);
+        } else {
+          ctx.fillStyle = '#39414f';
+          ctx.fillText(ch, cx, hitY + kbH - size * 0.9);
+        }
+      }
+      ctx.restore();
     }
   }
 

@@ -30,6 +30,8 @@ export class Visualizer3D {
     this.pool = [];
     this.spb = 1;
     this.lastT = -4;
+    this.liveInput = null; // midi -> {vel}: keys the user is holding right now
+    this.userColor = new THREE.Color(0xe9f2ff);
 
     this.#buildPiano();
     this.#buildStrings();
@@ -270,6 +272,41 @@ export class Visualizer3D {
     this.lastT = -4;
   }
 
+  // ---------- play-mode input ----------
+
+  /** Share a live map of midi -> {vel} for keys the user is holding. */
+  setLiveInput(map) {
+    this.liveInput = map;
+  }
+
+  /** Float a key-cap label over each mapped piano key (midi -> letter), or null to clear. */
+  setKeyLabels(labels) {
+    if (!this.labelGroup) {
+      this.labelGroup = new THREE.Group();
+      this.scene.add(this.labelGroup);
+      this.labelTex = new Map();
+    }
+    for (const s of this.labelGroup.children) s.material.dispose();
+    this.labelGroup.clear();
+    if (!labels) return;
+    for (const [midi, ch] of labels) {
+      const k = this.layout.keys.get(midi);
+      if (!k || !ch) continue;
+      let tex = this.labelTex.get(ch);
+      if (!tex) {
+        tex = makeLabelTexture(ch);
+        this.labelTex.set(ch, tex);
+      }
+      const sprite = new THREE.Sprite(
+        new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, opacity: 0.92 })
+      );
+      sprite.position.set(k.x + k.w / 2 - 26, k.black ? 1.0 : 0.55, k.black ? 2.6 : 4.7);
+      sprite.scale.set(0.62, 0.62, 1);
+      sprite.renderOrder = 10;
+      this.labelGroup.add(sprite);
+    }
+  }
+
   // ---------- per-frame ----------
 
   resize() {
@@ -381,6 +418,11 @@ export class Visualizer3D {
         if (n.hand === 'L') energyL += n.vel; else energyR += n.vel;
       }
     }
+    // keys the user is physically holding override the scheduled lighting
+    if (this.liveInput) {
+      for (const [midi, v] of this.liveInput)
+        activeByMidi.set(midi, { midi, hand: 'U', vel: v.vel ?? 0.8 });
+    }
     const tNow = this.lastT;
     if (this.deck === 'piano') {
       for (const [midi, k] of this.keys) {
@@ -388,7 +430,7 @@ export class Visualizer3D {
         k.press += ((n ? 1 : 0) - k.press) * Math.min(dt * 18, 1);
         k.mesh.rotation.x = k.press * 0.055;
         if (n) {
-          k.mat.emissive.copy(this.handColors?.[n.hand] || new THREE.Color(0x6fb7ff));
+          k.mat.emissive.copy(this.handColors?.[n.hand] || this.userColor);
           k.mat.emissiveIntensity = 0.55 * k.press * (0.5 + n.vel * 0.5);
         } else {
           k.mat.emissiveIntensity *= k.press < 0.02 ? 0 : 0.9;
@@ -401,7 +443,7 @@ export class Visualizer3D {
         s.press += ((n ? 1 : 0) - s.press) * Math.min(dt * (n ? 22 : 2.2), 1);
         s.mesh.position.x = s.baseX + Math.sin(tNow * 55 + midi) * 0.07 * s.press;
         if (n) {
-          s.mat.emissive.copy(this.handColors?.[n.hand] || new THREE.Color(0x6fb7ff));
+          s.mat.emissive.copy(this.handColors?.[n.hand] || this.userColor);
           s.mat.emissiveIntensity = 0.9 * (0.5 + n.vel * 0.5);
         } else {
           s.mat.emissiveIntensity *= 0.95;
@@ -413,7 +455,7 @@ export class Visualizer3D {
         h.press += ((n ? 1 : 0) - h.press) * Math.min(dt * 16, 1);
         h.mesh.position.y = h.baseY + h.press * 0.16;
         if (n) {
-          h.mat.emissive.copy(this.handColors?.[n.hand] || new THREE.Color(0x6fb7ff));
+          h.mat.emissive.copy(this.handColors?.[n.hand] || this.userColor);
           h.mat.emissiveIntensity = 1.1 * (0.4 + n.vel * 0.6);
         } else {
           h.mat.emissiveIntensity *= 0.9;
@@ -486,6 +528,25 @@ export class Visualizer3D {
     this.progressEl.style.color = this.piece?.accent || '#6fb7ff';
     this.progressEl.style.width = `${Math.min(Math.max(progress, 0), 1) * 100}%`;
   }
+}
+
+function makeLabelTexture(ch) {
+  const c = document.createElement('canvas');
+  c.width = c.height = 96;
+  const ctx = c.getContext('2d');
+  ctx.beginPath();
+  ctx.arc(48, 48, 40, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(7, 11, 22, 0.82)';
+  ctx.fill();
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = 'rgba(150, 190, 255, 0.85)';
+  ctx.stroke();
+  ctx.fillStyle = '#eaf2ff';
+  ctx.font = '600 42px system-ui, -apple-system, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(ch, 48, 50);
+  return new THREE.CanvasTexture(c);
 }
 
 function makeGlowTexture() {
