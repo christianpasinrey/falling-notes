@@ -37,6 +37,7 @@ export class Sequencer {
     // via their tempo map; the integer grid for hand-authored ones)
     this.metronome = false;
     this.drums = null;
+    this.drumKit = null; // DRUM_KITS key, or null for the synthesized kit
     this.beats = piece.beatTimes || Array.from({ length: Math.ceil(piece.totalBeats) + 1 }, (_, i) => i);
     this.beatsPerBar = piece.beatsPerBar || 0;
     this.beatIndex = 0;
@@ -123,7 +124,8 @@ export class Sequencer {
               : beatS + this.spb;
             const pos = this.beatIndex % this.drums.bar;
             for (const [b, type, vel] of this.drums.steps)
-              if (Math.floor(b) === pos) this.synth.drum(type, when + (b - pos) * (nextS - beatS), vel);
+              if (Math.floor(b) === pos)
+                this.synth.drum(type, when + (b - pos) * (nextS - beatS), vel, this.drumKit);
           }
           this.beatIndex++;
         }

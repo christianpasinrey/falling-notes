@@ -437,7 +437,9 @@ body.playing #controls:hover { opacity: 1; }
   background: color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
-#beat-select {
+#beat-select,
+#kit-select,
+#rate-select {
   border: none;
   background: transparent;
   color: var(--ink-dim);
@@ -448,8 +450,13 @@ body.playing #controls:hover { opacity: 1; }
   outline: none;
   max-width: 6rem;
 }
-#beat-select.on { color: var(--accent); }
-#beat-select option { background: #0a0d15; color: var(--ink); font-style: normal; }
+#beat-select.on,
+#kit-select.on,
+#rate-select.on { color: var(--accent); }
+#beat-select option,
+#kit-select option,
+#rate-select option { background: #0a0d15; color: var(--ink); font-style: normal; }
+#kit-select[hidden] { display: none; }
 
 /* ---- voices / tracks panel ---- */
 #voices-panel[hidden] { display: none; }

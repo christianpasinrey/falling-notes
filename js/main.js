@@ -147,16 +147,61 @@ function pickVoice(v) {
 
 // — drums: a groove laid on the piece's own beat grid —
 const beatSelect = document.getElementById('beat-select');
+const kitSelect = document.getElementById('kit-select');
 let beat = localStorage.getItem('fn-beat') || '';
 if ([...beatSelect.options].some((o) => o.value === beat)) beatSelect.value = beat;
 else beat = '';
+let kit = localStorage.getItem('fn-kit') ?? 'acoustic';
+if ([...kitSelect.options].some((o) => o.value === kit)) kitSelect.value = kit;
+else kit = 'acoustic';
 beatSelect.classList.toggle('on', !!beat);
+kitSelect.hidden = !beat;
 beatSelect.addEventListener('change', () => {
   beat = beatSelect.value;
   localStorage.setItem('fn-beat', beat);
   beatSelect.classList.toggle('on', !!beat);
+  kitSelect.hidden = !beat;
   seq?.setDrums(beat || null);
 });
+kitSelect.addEventListener('change', () => {
+  kit = kitSelect.value;
+  localStorage.setItem('fn-kit', kit);
+  if (seq) seq.drumKit = kit || null;
+});
+
+// — playback speed: scales the whole clock; pieces restart on change —
+const rateSelect = document.getElementById('rate-select');
+let rate = parseFloat(localStorage.getItem('fn-rate')) || 1;
+if ([...rateSelect.options].some((o) => parseFloat(o.value) === rate)) rateSelect.value = String(rate);
+else rate = 1;
+rateSelect.classList.toggle('on', rate !== 1);
+rateSelect.addEventListener('change', () => {
+  rate = parseFloat(rateSelect.value);
+  localStorage.setItem('fn-rate', String(rate));
+  rateSelect.classList.toggle('on', rate !== 1);
+  if (seq && document.body.classList.contains('playing')) start(currentIndex);
+});
+
+// Mark the grooves that musically fit the piece's *effective* tempo (its real
+// beat length × the chosen speed) with a star.
+function updateBeatRecommendations() {
+  if (!seq) return;
+  const iv = [];
+  for (let i = 1; i < Math.min(seq.beats.length, 65); i++)
+    iv.push((seq.beats[i] - seq.beats[i - 1]) * seq.spb);
+  iv.sort((a, b) => a - b);
+  const bpm = iv.length ? 60 / Math.max(iv[Math.floor(iv.length / 2)], 0.05) : 100;
+  const rec = new Set();
+  if (seq.beatsPerBar === 3) rec.add('waltz');
+  if (bpm < 85) rec.add('bossa');
+  if (bpm >= 70 && bpm <= 120) rec.add('pop');
+  if (bpm >= 95 && bpm <= 150) rec.add('rock');
+  if (bpm >= 110) rec.add('funk');
+  for (const o of beatSelect.options) {
+    if (!o.value) continue;
+    o.textContent = o.value + (rec.has(o.value) ? ' ★' : '');
+  }
+}
 
 // — metronome: ticks on the piece's own beat grid —
 let metronome = localStorage.getItem('fn-metronome') === '1';
@@ -268,6 +313,10 @@ async function start(index) {
   }
   if (token !== startToken) return; // a newer start superseded this one
 
+  // the speed control scales the whole clock — audio, visuals and judging
+  // all derive from bpm, so one scaled copy adjusts everything coherently
+  if (rate !== 1) piece = { ...piece, bpm: piece.bpm * rate };
+
   // hand-authored featured pieces have two implicit voices: the hands
   if (!piece.voices) piece.voices = [{ name: 'right hand' }, { name: 'left hand' }];
   currentPiece = piece;
@@ -287,6 +336,8 @@ async function start(index) {
   seq.onended = () => start(currentIndex + 1); // autoplay: on to the next
   seq.setMetronome(metronome);
   seq.setDrums(beat || null);
+  seq.drumKit = kit || null;
+  updateBeatRecommendations();
   viz.setPiece(piece);
   setPaused(false);
   voicesBtn.style.display = piece.voices.length > 1 ? '' : 'none';

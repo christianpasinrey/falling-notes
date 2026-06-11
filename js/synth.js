@@ -24,6 +24,32 @@ try {
   // no OfflineAudioContext: the procedural piano carries the whole show
 }
 
+// — drum kits: CC0 one-shots from the Sonic Pi sample library (freesound) —
+// each kit names a sample per drum; until a buffer arrives (or for the
+// 'synth' kit) the procedural drum voices below take over.
+export const DRUM_KITS = {
+  acoustic: { kick: 'drum_heavy_kick', snare: 'drum_snare_hard', hat: 'drum_cymbal_closed', openhat: 'drum_cymbal_open' },
+  '808': { kick: 'bd_808', snare: 'sn_dolf', hat: 'hat_cab', openhat: 'drum_cymbal_open' },
+  club: { kick: 'bd_haus', snare: 'sn_dub', hat: 'hat_gnu', openhat: 'drum_cymbal_open' },
+};
+const drumBuffers = new Map(); // sample file -> AudioBuffer
+
+try {
+  const decodeCtx = new OfflineAudioContext(2, 1, 44100);
+
+  const drumFiles = new Set();
+  for (const kit of Object.values(DRUM_KITS)) for (const f of Object.values(kit)) drumFiles.add(f);
+  for (const f of drumFiles) {
+    fetch(`assets/drums/${f}.flac`)
+      .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error('http ' + r.status))))
+      .then((buf) => decodeCtx.decodeAudioData(buf))
+      .then((audio) => drumBuffers.set(f, audio))
+      .catch(() => {});
+  }
+} catch {
+  // no OfflineAudioContext: procedural drums carry on
+}
+
 const PATCHES = {
   piano: { harmonics: [0, 1, 0.42, 0.2, 0.1, 0.06, 0.035, 0.02], attack: 0.006, env: 'percussive', shimmer: true },
   pluck: { harmonics: [0, 1, 0.55, 0.32, 0.16, 0.08, 0.04, 0.02], attack: 0.004, env: 'pluck', shimmer: true },
@@ -260,8 +286,20 @@ export class PianoSynth {
     }
   }
 
-  /** Synthesized drum kit — kick, snare, closed/open hat. No samples. */
-  drum(type, when, vel = 1) {
+  /** Drum hit — a sampled kit when chosen and loaded, synthesis otherwise. */
+  drum(type, when, vel = 1, kit = null) {
+    const file = DRUM_KITS[kit]?.[type];
+    const buf = file && drumBuffers.get(file);
+    if (buf) {
+      const src = this.ctx.createBufferSource();
+      src.buffer = buf;
+      const g = this.ctx.createGain();
+      g.gain.setValueAtTime((type === 'kick' ? 0.65 : type === 'snare' ? 0.5 : 0.35) * vel, when);
+      src.connect(g);
+      g.connect(this.dry);
+      src.start(when);
+      return;
+    }
     const ctx = this.ctx;
     if (type === 'kick') {
       const osc = ctx.createOscillator();
@@ -334,7 +372,7 @@ export class PianoSynth {
     osc.type = 'triangle';
     osc.frequency.value = strong ? 1900 : 1300;
     const g = ctx.createGain();
-    g.gain.setValueAtTime(strong ? 0.16 : 0.11, when);
+    g.gain.setValueAtTime(strong ? 0.28 : 0.19, when);
     g.gain.exponentialRampToValueAtTime(0.0001, when + 0.05);
     osc.connect(g);
     g.connect(this.dry);
