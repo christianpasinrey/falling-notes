@@ -4,7 +4,7 @@
 
 import { app } from './app.js';
 import { play } from './player.js';
-import { encodeRecording } from './recording.js';
+import { encodeRecording, encodeWavBlob } from './recording.js';
 
 const pgBar = document.getElementById('pg-bar');
 const recBtn = document.getElementById('pg-record');
@@ -35,10 +35,13 @@ const playgroundItem = {
   }),
 };
 
-let recorder = null;
+let recording = false;
 let recStart = 0;
 let recNotes = []; // [[midi, startS, durS, 'R', vel]]
 const openNotes = new Map(); // midi -> {t, vel}
+let proc = null; // ScriptProcessor tapping raw PCM off the mix
+let muteNode = null;
+let pcmL = [], pcmR = [];
 
 export function initPlayground() {
   document.getElementById('playground-btn').addEventListener('click', () => play([playgroundItem], 0));
@@ -52,7 +55,7 @@ export function initPlayground() {
     }
   };
   app.onPieceEnd = () => {
-    if (recorder) stopRecording();
+    if (recording) stopRecording();
     app.onUserNote = null;
     pgBar.hidden = true;
   };
@@ -65,8 +68,8 @@ export function initPlayground() {
 function handleUserNote(type, midi, vel) {
   if (type === 'on') {
     app.viz.hitBurst(midi, 'good'); // every press sparkles in free play
-    if (recorder) openNotes.set(midi, { t: app.synth.now - recStart, vel });
-  } else if (recorder) {
+    if (recording) openNotes.set(midi, { t: app.synth.now - recStart, vel });
+  } else if (recording) {
     const o = openNotes.get(midi);
     if (!o) return;
     openNotes.delete(midi);
@@ -75,25 +78,27 @@ function handleUserNote(type, midi, vel) {
 }
 
 function startRecording() {
-  if (!app.synth || recorder) return;
+  if (!app.synth || recording) return;
+  recording = true;
   recNotes = [];
   openNotes.clear();
+  pcmL = [];
+  pcmR = [];
   recStart = app.synth.now;
-  recorder = new MediaRecorder(app.synth.captureStream());
-  const chunks = [];
-  recorder.ondataavailable = (e) => chunks.push(e.data);
-  recorder.onstop = () => {
-    const blob = new Blob(chunks, { type: recorder?.mimeType || 'audio/webm' });
-    downloadLink.href = URL.createObjectURL(blob);
-    downloadLink.download = 'falling-notes-recording.webm';
-    downloadLink.hidden = false;
-    shareBtn.hidden = recNotes.length === 0;
-    statusEl.textContent = recNotes.length
-      ? `${recNotes.length} notes recorded`
-      : 'nothing played — nothing to share';
-    recorder = null;
+
+  // tap raw PCM off the full mix; WAV needs no encoder and opens anywhere
+  const ctx = app.synth.ctx;
+  proc = ctx.createScriptProcessor(4096, 2, 2);
+  app.synth.comp.connect(proc);
+  muteNode = ctx.createGain();
+  muteNode.gain.value = 0; // the processor must reach the destination to run
+  proc.connect(muteNode);
+  muteNode.connect(ctx.destination);
+  proc.onaudioprocess = (e) => {
+    pcmL.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+    pcmR.push(new Float32Array(e.inputBuffer.getChannelData(1)));
   };
-  recorder.start();
+
   recBtn.hidden = true;
   stopBtn.hidden = false;
   downloadLink.hidden = true;
@@ -102,11 +107,27 @@ function startRecording() {
 }
 
 function stopRecording() {
-  if (!recorder) return;
+  if (!recording) return;
+  recording = false;
   const now = app.synth.now - recStart;
   for (const [midi, o] of openNotes) recNotes.push([midi, o.t, Math.max(now - o.t, 0.05), 'R', o.vel]);
   openNotes.clear();
-  recorder.stop();
+
+  proc.onaudioprocess = null;
+  app.synth.comp.disconnect(proc);
+  proc.disconnect();
+  muteNode.disconnect();
+  proc = muteNode = null;
+
+  const blob = encodeWavBlob(pcmL, pcmR, app.synth.ctx.sampleRate);
+  pcmL = pcmR = [];
+  downloadLink.href = URL.createObjectURL(blob);
+  downloadLink.download = 'falling-notes-recording.wav';
+  downloadLink.hidden = false;
+  shareBtn.hidden = recNotes.length === 0;
+  statusEl.textContent = recNotes.length
+    ? `${recNotes.length} notes recorded`
+    : 'nothing played — nothing to share';
   recBtn.hidden = false;
   stopBtn.hidden = true;
 }

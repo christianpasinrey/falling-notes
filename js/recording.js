@@ -71,3 +71,37 @@ export function pieceFromRecording(notes) {
 }
 
 const round3 = (x) => Math.round(x * 1000) / 1000;
+
+/** Raw stereo Float32 chunks -> a 16-bit PCM WAV blob (opens anywhere). */
+export function encodeWavBlob(chunksL, chunksR, sampleRate) {
+  const len = chunksL.reduce((a, c) => a + c.length, 0);
+  const buf = new ArrayBuffer(44 + len * 4);
+  const view = new DataView(buf);
+  const str = (o, s) => {
+    for (let i = 0; i < s.length; i++) view.setUint8(o + i, s.charCodeAt(i));
+  };
+  str(0, 'RIFF');
+  view.setUint32(4, 36 + len * 4, true);
+  str(8, 'WAVE');
+  str(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true); // PCM
+  view.setUint16(22, 2, true); // stereo
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 4, true);
+  view.setUint16(32, 4, true);
+  view.setUint16(34, 16, true);
+  str(36, 'data');
+  view.setUint32(40, len * 4, true);
+  let o = 44;
+  for (let c = 0; c < chunksL.length; c++) {
+    const L = chunksL[c], R = chunksR[c];
+    for (let i = 0; i < L.length; i++) {
+      view.setInt16(o, Math.max(-1, Math.min(1, L[i])) * 0x7fff, true);
+      o += 2;
+      view.setInt16(o, Math.max(-1, Math.min(1, R[i] ?? L[i])) * 0x7fff, true);
+      o += 2;
+    }
+  }
+  return new Blob([buf], { type: 'audio/wav' });
+}

@@ -52,7 +52,8 @@ beautiful problem).
 
 Free play: no falling notes, just the piano (and any groove/tempo you pick)
 responding to what you press. Hit **⏺ record** and when you stop you can
-**download the audio** of your take or **copy a share link** — the notes are
+**download the audio** of your take (a plain WAV that opens anywhere) or
+**copy a share link** — the notes are
 compressed into the URL itself, so there is no upload and no server: whoever
 opens the link gets your recording as a playable piece, falling notes and all,
 ready to listen to or learn in practice mode.

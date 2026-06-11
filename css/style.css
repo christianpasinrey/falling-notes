@@ -399,7 +399,14 @@ html, body {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.shared-card { outline: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); }
+.shared-card {
+  outline: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  animation: shared-glow 2.2s ease-in-out infinite;
+}
+@keyframes shared-glow {
+  0%, 100% { box-shadow: 0 0 0 rgba(0, 0, 0, 0); }
+  50% { box-shadow: 0 0 32px -6px color-mix(in srgb, var(--accent) 60%, transparent); }
+}
 
 /* ---- playing caption ---- */
 #caption {
