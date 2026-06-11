@@ -1,7 +1,7 @@
 import { PianoSynth } from './synth.js';
-import { Sequencer } from './sequencer.js';
+import { Sequencer, noteVoice } from './sequencer.js';
 import { PIECES } from './pieces/index.js';
-import { loadCatalog, loadCatalogPiece, buildPieceFromMidi } from './catalog.js';
+import { loadCatalog, loadCatalogPiece, buildPieceFromMidiSet } from './catalog.js';
 import { NoteInput } from './input.js';
 import { Judge } from './judge.js';
 
@@ -89,6 +89,66 @@ function refreshKeyLabels() {
 for (const btn of modeButtons) btn.addEventListener('click', () => setMode(btn.dataset.mode, { restart: true }));
 setMode(mode);
 
+// — voices: mute tracks while listening, pick the one you play otherwise —
+const voicesPanel = document.getElementById('voices-panel');
+const voicesBtn = document.getElementById('btn-voices');
+let currentPiece = null;
+let lastPieceId = null;
+let playerVoice = 'all';
+const mutedVoices = new Set(); // shared live with the sequencer
+
+voicesBtn.addEventListener('click', () => {
+  voicesPanel.hidden = !voicesPanel.hidden;
+});
+
+function renderVoicesPanel() {
+  voicesPanel.replaceChildren();
+  if (!currentPiece) return;
+  const addRow = (label, { mine = false, muted = false, onPick, onMute }) => {
+    const row = document.createElement('button');
+    row.className = 'v-row' + (mine ? ' mine' : '') + (muted ? ' muted' : '');
+    if (onMute) {
+      const m = document.createElement('span');
+      m.className = 'v-mute';
+      m.title = muted ? 'unmute' : 'mute';
+      m.textContent = muted ? '○' : '◉';
+      m.addEventListener('click', (e) => {
+        e.stopPropagation();
+        onMute();
+      });
+      row.appendChild(m);
+    }
+    const name = document.createElement('span');
+    name.className = 'v-name';
+    name.textContent = label;
+    row.appendChild(name);
+    row.addEventListener('click', onPick);
+    voicesPanel.appendChild(row);
+  };
+  if (mode !== 'listen')
+    addRow('🎹 play every voice yourself', { mine: playerVoice === 'all', onPick: () => pickVoice('all') });
+  currentPiece.voices.forEach((v, i) => {
+    const mine = mode !== 'listen' && playerVoice === i;
+    addRow((mine ? '🎹 ' : '') + v.name, {
+      mine,
+      muted: mutedVoices.has(i),
+      onPick: mode === 'listen' ? () => toggleMute(i) : () => pickVoice(i),
+      onMute: () => toggleMute(i),
+    });
+  });
+}
+
+function toggleMute(i) {
+  mutedVoices.has(i) ? mutedVoices.delete(i) : mutedVoices.add(i);
+  renderVoicesPanel(); // the sequencer shares the set — applies within the look-ahead
+}
+
+function pickVoice(v) {
+  if (v === playerVoice) return;
+  playerVoice = v;
+  start(currentIndex); // the judge and the silence map depend on it
+}
+
 input.onnoteon = (midi, vel) => {
   if (!synth || paused) return;
   synth.noteOn(midi, vel);
@@ -112,7 +172,13 @@ function showWaiting(gate) {
   shownGate = key;
   judgeAnim?.cancel();
   hudJudge.className = 'wait';
-  hudJudge.textContent = '⏸ ' + gate.midis.map(noteName).join(' + ');
+  let text = '⏸ ' + gate.midis.map(noteName).join(' + ');
+  if (input.source === 'keyboard') {
+    // scoring folds octaves on QWERTY, so the plain-zone key always works
+    const keys = [...new Set(gate.midis.map((m) => input.keyForPitch(m)).filter(Boolean))];
+    if (keys.length) text += ` — press ${keys.join(' + ')}`;
+  }
+  hudJudge.textContent = text;
 }
 
 let judgeAnim = null;
@@ -170,23 +236,41 @@ async function start(index) {
   }
   if (token !== startToken) return; // a newer start superseded this one
 
+  // hand-authored featured pieces have two implicit voices: the hands
+  if (!piece.voices) piece.voices = [{ name: 'right hand' }, { name: 'left hand' }];
+  currentPiece = piece;
+  if (piece.id !== lastPieceId) {
+    lastPieceId = piece.id;
+    playerVoice = 'all';
+    mutedVoices.clear();
+  }
+
   // A fresh context every run keeps restart trivial and leak-free.
   if (synth) synth.ctx.close();
   synth = new PianoSynth();
-  seq = new Sequencer(synth, piece, { silent: mode !== 'listen' });
+  seq = new Sequencer(synth, piece, {
+    playerVoice: mode === 'listen' ? null : playerVoice,
+    muted: mutedVoices,
+  });
   seq.onended = () => start(currentIndex + 1); // autoplay: on to the next
   viz.setPiece(piece);
   setPaused(false);
+  voicesBtn.style.display = piece.voices.length > 1 ? '' : 'none';
+  if (piece.voices.length < 2) voicesPanel.hidden = true;
+  renderVoicesPanel();
 
   liveInput.clear();
   shownGate = '';
+  viz.setTargets(null);
   if (mode !== 'listen') {
+    // you are judged on (and fitted to) the voice you chose to play
+    const mine = seq.notes.filter((n) => playerVoice === 'all' || noteVoice(n) === playerVoice);
     judge = new Judge(
-      seq.notes.map(([midi, beat]) => ({ midi, start: beat * seq.spb })),
+      mine.map(([midi, beat]) => ({ midi, start: beat * seq.spb })),
       { fold: input.source === 'keyboard' }
     );
     let lo = 108, hi = 21;
-    for (const [midi] of seq.notes) {
+    for (const [midi] of mine) {
       if (midi < lo) lo = midi;
       if (midi > hi) hi = midi;
     }
@@ -226,7 +310,9 @@ function backToMenu() {
   input.detach();
   liveInput.clear();
   viz.setKeyLabels(null);
+  viz.setTargets(null);
   playhud.hidden = true;
+  voicesPanel.hidden = true;
   setPaused(false);
   document.body.classList.remove('playing');
   overlay.classList.remove('hidden');
@@ -308,24 +394,24 @@ function renderExplorer(query) {
 const midiFile = document.getElementById('midi-file');
 document.getElementById('open-midi-btn').addEventListener('click', () => midiFile.click());
 midiFile.addEventListener('change', () => {
-  loadLocalMidi(midiFile.files[0]);
-  midiFile.value = ''; // so picking the same file again still fires change
+  loadLocalMidi(midiFile.files);
+  midiFile.value = ''; // so picking the same files again still fires change
 });
 window.addEventListener('dragover', (e) => e.preventDefault());
 window.addEventListener('drop', (e) => {
   e.preventDefault();
-  const file = [...e.dataTransfer.files].find((f) => /\.(mid|midi|kar)$/i.test(f.name));
-  if (file) loadLocalMidi(file);
+  loadLocalMidi(e.dataTransfer.files);
 });
 
-async function loadLocalMidi(file) {
-  if (!file) return;
-  const buf = await file.arrayBuffer();
-  const title = file.name.replace(/\.(mid|midi|kar)$/i, '').replace(/[_-]+/g, ' ');
-  const idSeed = [...file.name].reduce((a, c) => a + c.charCodeAt(0), 0);
+// One file plays as-is (its tracks are the voices); several files merge into
+// one piece where each FILE is a voice — mixing unrelated songs is on you.
+async function loadLocalMidi(fileList) {
+  const picked = [...(fileList || [])].filter((f) => /\.(mid|midi|kar)$/i.test(f.name));
+  if (!picked.length) return;
+  const files = await Promise.all(picked.map(async (f) => ({ buf: await f.arrayBuffer(), name: f.name })));
   playlist = [{
-    label: title,
-    load: async () => buildPieceFromMidi(buf, { idSeed, title, composer: 'your file', mood: 'yours' }),
+    label: picked.length === 1 ? picked[0].name : `${picked.length} MIDI files`,
+    load: async () => buildPieceFromMidiSet(files),
   }];
   start(0);
 }
@@ -358,6 +444,7 @@ function frame() {
     if (mode === 'practice') {
       // hold the piece at the next unplayed note (or chord) until it lands
       const gate = judge.nextGate();
+      viz.setTargets(gate ? gate.midis : null);
       if (gate && seq.songTime > gate.start) {
         seq.holdAt(gate.start);
         showWaiting(gate);

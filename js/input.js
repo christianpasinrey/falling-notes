@@ -102,6 +102,13 @@ export class NoteInput {
     }
   }
 
+  /** Key-cap that plays this pitch class in the plain zone (scoring folds octaves). */
+  keyForPitch(midi) {
+    for (const [code, semi] of KEY_TO_SEMITONE)
+      if ((this.baseMidi + semi) % 12 === midi % 12) return this.labels.get(code);
+    return null;
+  }
+
   /** Request Web MIDI once (prompts for permission); safe to re-call. */
   async enableMidi() {
     if (this.access !== undefined) return;

@@ -60,6 +60,11 @@ export class Visualizer {
     this.keyLabels = labels;
   }
 
+  /** Practice mode: pulse these keys until they are played (null clears). */
+  setTargets(midis) {
+    this.targets = midis?.length ? new Set(midis) : null;
+  }
+
   resize() {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     this.w = window.innerWidth;
@@ -349,6 +354,12 @@ export class Visualizer {
         ctx.shadowBlur = 18;
         ctx.fillRect(k.x + 0.5, hitY, k.w - 1, kbH);
         ctx.restore();
+      } else if (this.targets?.has(midi)) {
+        ctx.save();
+        ctx.globalAlpha = 0.3 + 0.2 * Math.sin((this.t || 0) * 7);
+        ctx.fillStyle = this.accent;
+        ctx.fillRect(k.x + 0.5, hitY, k.w - 1, kbH);
+        ctx.restore();
       }
     }
 
@@ -370,6 +381,15 @@ export class Visualizer {
       ctx.beginPath();
       ctx.roundRect(k.x, hitY, k.w, bH, [0, 0, 3, 3]);
       ctx.fill();
+      if (!lit && this.targets?.has(midi)) {
+        ctx.save();
+        ctx.globalAlpha = 0.35 + 0.25 * Math.sin((this.t || 0) * 7);
+        ctx.fillStyle = this.accent;
+        ctx.beginPath();
+        ctx.roundRect(k.x, hitY, k.w, bH, [0, 0, 3, 3]);
+        ctx.fill();
+        ctx.restore();
+      }
     }
 
     // QWERTY play-mode: paint the computer key cap on its piano key

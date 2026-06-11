@@ -28,7 +28,7 @@
       <button id="explore-btn">✦ Mutopia library — 2,100+ pieces</button>
       <button id="open-midi-btn">♬ open your own MIDI file</button>
     </div>
-    <input id="midi-file" type="file" accept=".mid,.midi,audio/midi" hidden />
+    <input id="midi-file" type="file" accept=".mid,.midi,audio/midi" multiple hidden />
     <div id="explorer" hidden>
       <div class="ex-head">
         <button id="ex-back" aria-label="Back to featured">←</button>
@@ -80,7 +80,13 @@
     <button class="ctl-mode" data-mode="listen" title="listen — the piano plays itself">✧</button>
     <button class="ctl-mode" data-mode="play" title="play — you play it, scored">♪</button>
     <button class="ctl-mode" data-mode="practice" title="practice — waits for your key">❋</button>
+    <span class="ctl-sep" aria-hidden="true"></span>
+    <button id="btn-voices" aria-label="Voices" title="voices — mute tracks, or pick the one you play">
+      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h10v2H4z" fill="currentColor"/></svg>
+    </button>
   </nav>
+
+  <div id="voices-panel" hidden></div>
 
   <script type="importmap">
     {

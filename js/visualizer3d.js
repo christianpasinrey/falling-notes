@@ -32,6 +32,8 @@ export class Visualizer3D {
     this.lastT = -4;
     this.liveInput = null; // midi -> {vel}: keys the user is holding right now
     this.userColor = new THREE.Color(0xe9f2ff);
+    this.targets = null; // practice mode: keys the player must press next
+    this.targetColor = new THREE.Color(0x9fc4ff);
 
     this.#buildPiano();
     this.#buildStrings();
@@ -279,6 +281,11 @@ export class Visualizer3D {
     this.liveInput = map;
   }
 
+  /** Practice mode: pulse these keys until they are played (null clears). */
+  setTargets(midis) {
+    this.targets = midis?.length ? new Set(midis) : null;
+  }
+
   /** Float a key-cap label over each mapped piano key (midi -> letter), or null to clear. */
   setKeyLabels(labels) {
     if (!this.labelGroup) {
@@ -434,6 +441,9 @@ export class Visualizer3D {
         if (n) {
           k.mat.emissive.copy(this.handColors?.[n.hand] || this.userColor);
           k.mat.emissiveIntensity = 0.55 * k.press * (0.5 + n.vel * 0.5);
+        } else if (this.targets?.has(midi)) {
+          k.mat.emissive.copy(this.targetColor);
+          k.mat.emissiveIntensity = 0.5 + 0.35 * Math.sin(tNow * 7);
         } else {
           k.mat.emissiveIntensity *= k.press < 0.02 ? 0 : 0.9;
         }
@@ -447,6 +457,9 @@ export class Visualizer3D {
         if (n) {
           s.mat.emissive.copy(this.handColors?.[n.hand] || this.userColor);
           s.mat.emissiveIntensity = 0.9 * (0.5 + n.vel * 0.5);
+        } else if (this.targets?.has(midi)) {
+          s.mat.emissive.copy(this.targetColor);
+          s.mat.emissiveIntensity = 0.5 + 0.35 * Math.sin(tNow * 7);
         } else {
           s.mat.emissiveIntensity *= 0.95;
         }
@@ -459,6 +472,9 @@ export class Visualizer3D {
         if (n) {
           h.mat.emissive.copy(this.handColors?.[n.hand] || this.userColor);
           h.mat.emissiveIntensity = 1.1 * (0.4 + n.vel * 0.6);
+        } else if (this.targets?.has(midi)) {
+          h.mat.emissive.copy(this.targetColor);
+          h.mat.emissiveIntensity = 0.5 + 0.35 * Math.sin(tNow * 7);
         } else {
           h.mat.emissiveIntensity *= 0.9;
         }
