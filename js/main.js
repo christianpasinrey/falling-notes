@@ -42,7 +42,6 @@ const playhud = document.getElementById('playhud');
 const hudJudge = document.getElementById('hud-judge');
 const hudScore = document.getElementById('hud-score');
 const hudCombo = document.getElementById('hud-combo');
-const hudInput = document.getElementById('hud-input');
 const modeHint = document.getElementById('mode-hint');
 const modeButtons = document.querySelectorAll('[data-mode]');
 
@@ -73,9 +72,6 @@ function updateModeHint() {
 }
 
 function updateInputStatus() {
-  hudInput.textContent = input.midiName
-    ? `MIDI · ${input.midiName}`
-    : `computer keys · hold L/R shift = 2 octaves down/up · ↑/↓ moves home (Z = ${input.octaveName})`;
   if (judge) judge.fold = input.source === 'keyboard';
   updateModeHint();
   refreshKeyLabels();

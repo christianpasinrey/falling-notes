@@ -356,15 +356,6 @@ html, body {
   color: var(--accent);
   letter-spacing: 0.1em;
 }
-#hud-input {
-  position: fixed;
-  left: 1.2rem;
-  top: 3.4rem;
-  font-size: 0.8rem;
-  font-style: italic;
-  letter-spacing: 0.1em;
-  color: var(--ink-dim);
-}
 
 /* ---- playing caption ---- */
 #caption {

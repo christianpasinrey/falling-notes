@@ -126,12 +126,6 @@ export class Visualizer3D {
     );
     board.position.set(0, -0.5, 2.6);
     g.add(board);
-    const yoke = new THREE.Mesh(
-      new THREE.BoxGeometry(53.6, 0.35, 0.5),
-      new THREE.MeshStandardMaterial({ color: 0x2a2438, roughness: 0.4, metalness: 0.5 })
-    );
-    yoke.position.set(0, 9.4, 2.2);
-    g.add(yoke);
     g.visible = false;
     this.scene.add(g);
     this.deckStrings = g;
