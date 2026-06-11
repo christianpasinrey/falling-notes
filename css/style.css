@@ -180,7 +180,8 @@ html, body {
   animation: rise 1.1s 0.55s ease both;
 }
 #explore-btn,
-#open-midi-btn {
+#open-midi-btn,
+#playground-btn {
   padding: 0.55rem 1.3rem;
   border-radius: 999px;
   border: 1px solid rgba(111, 183, 255, 0.3);
@@ -194,7 +195,8 @@ html, body {
   transition: background 0.3s, color 0.3s, border-color 0.3s;
 }
 #explore-btn:hover,
-#open-midi-btn:hover { background: rgba(111, 183, 255, 0.16); color: var(--ink); border-color: rgba(111, 183, 255, 0.6); }
+#open-midi-btn:hover,
+#playground-btn:hover { background: rgba(111, 183, 255, 0.16); color: var(--ink); border-color: rgba(111, 183, 255, 0.6); }
 
 #overlay.exploring #pieces,
 #overlay.exploring #library-actions,
@@ -356,6 +358,78 @@ html, body {
   color: var(--accent);
   letter-spacing: 0.1em;
 }
+
+/* ---- shared recording modal ---- */
+#shared-modal[hidden] { display: none; }
+#shared-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  background: rgba(2, 3, 8, 0.72);
+  backdrop-filter: blur(4px);
+}
+.sm-box {
+  position: relative;
+  max-width: 26rem;
+  padding: 2.2rem 2.6rem 2rem;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  background: linear-gradient(160deg, rgba(17, 28, 52, 0.95), rgba(5, 8, 16, 0.97));
+  box-shadow: 0 0 70px -12px color-mix(in srgb, var(--accent) 50%, transparent);
+  text-align: center;
+  animation: rise 0.7s ease both;
+}
+.sm-eyebrow {
+  font-size: 0.78rem;
+  letter-spacing: 0.42em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.sm-box h2 {
+  margin-top: 0.5rem;
+  font-weight: 500;
+  font-size: 1.7rem;
+  line-height: 1.15;
+}
+#sm-meta {
+  margin-top: 0.4rem;
+  font-style: italic;
+  color: #8fa3c4;
+}
+.sm-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-top: 1.4rem;
+}
+.sm-actions button {
+  padding: 0.65rem 1.2rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 1.02rem;
+  cursor: pointer;
+  transition: background 0.25s, border-color 0.25s;
+}
+.sm-actions button:hover {
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+  border-color: var(--accent);
+}
+#sm-close {
+  position: absolute;
+  top: 0.55rem;
+  right: 0.8rem;
+  border: none;
+  background: transparent;
+  color: var(--ink-dim);
+  font-size: 1.4rem;
+  cursor: pointer;
+}
+#sm-close:hover { color: var(--ink); }
 
 /* ---- playground bar ---- */
 #pg-bar[hidden] { display: none; }

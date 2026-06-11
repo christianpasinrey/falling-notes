@@ -4,6 +4,7 @@
 import { PIECES } from './pieces/index.js';
 import { loadCatalog, loadCatalogPiece, buildPieceFromMidiSet } from './catalog.js';
 import { play } from './player.js';
+import { setMode } from './playmode.js';
 import { decodeRecording } from './recording.js';
 
 const overlay = document.getElementById('overlay');
@@ -61,29 +62,52 @@ export function initLibrary() {
     loadLocalMidi(e.dataTransfer.files);
   });
 
-  // — a shared playground recording arrived in the URL: offer it as a card —
+  // — a shared playground recording arrived in the URL: front and centre —
   if (location.hash.startsWith('#r=')) {
     decodeRecording(location.hash.slice(3)).then((piece) => {
       if (!piece) return;
-      const card = document.createElement('button');
-      card.className = 'card shared-card';
-      card.style.setProperty('--accent', piece.accent);
-      for (const [cls, text] of [
-        ['mood', '♪ shared with you'],
-        ['title', piece.title],
-        ['composer', piece.composer],
-        ['marking', 'press play — or learn it in practice mode'],
-        ['duration', piece.duration],
-      ]) {
-        const span = document.createElement('span');
-        span.className = cls;
-        span.textContent = text;
-        card.appendChild(span);
-      }
-      card.addEventListener('click', () => play([{ label: piece.title, load: async () => piece }], 0));
-      piecesEl.prepend(card);
+      const modal = document.getElementById('shared-modal');
+      const playIt = () => {
+        modal.hidden = true;
+        play([{ label: piece.title, load: async () => piece }], 0);
+      };
+      document.getElementById('sm-meta').textContent =
+        `${piece.notes.length} notes · ${piece.duration} — played in the Falling Notes playground`;
+      document.getElementById('sm-listen').addEventListener('click', () => {
+        setMode('listen');
+        playIt();
+      });
+      document.getElementById('sm-practice').addEventListener('click', () => {
+        setMode('practice');
+        playIt();
+      });
+      document.getElementById('sm-close').addEventListener('click', () => {
+        modal.hidden = true;
+        addSharedCard(piece); // still reachable from the menu afterwards
+      });
+      modal.hidden = false;
     });
   }
+}
+
+function addSharedCard(piece) {
+  const card = document.createElement('button');
+  card.className = 'card shared-card';
+  card.style.setProperty('--accent', piece.accent);
+  for (const [cls, text] of [
+    ['mood', '♪ shared'],
+    ['title', piece.title],
+    ['composer', piece.composer],
+    ['marking', 'press play — or learn it in practice mode'],
+    ['duration', piece.duration],
+  ]) {
+    const span = document.createElement('span');
+    span.className = cls;
+    span.textContent = text;
+    card.appendChild(span);
+  }
+  card.addEventListener('click', () => play([{ label: piece.title, load: async () => piece }], 0));
+  piecesEl.prepend(card);
 }
 
 function closeExplorer() {
