@@ -419,6 +419,25 @@ export class Visualizer {
     }
   }
 
+  /** A user hit lands: reward it — gold shower for perfect, blue for good. */
+  hitBurst(midi, kind) {
+    const key = this.layout.keys.get(midi);
+    if (!key) return;
+    const gold = kind === 'perfect';
+    const count = gold ? 18 : 10;
+    for (let i = 0; i < count; i++) {
+      this.particles.push({
+        x: key.x + key.w * Math.random(),
+        y: this.hitY - 2,
+        vx: (Math.random() - 0.5) * 70,
+        vy: -(40 + Math.random() * 110),
+        life: 1,
+        size: 1.5 + Math.random() * 2.5,
+        color: gold ? 'rgba(255, 226, 138, 0.9)' : 'rgba(143, 216, 255, 0.85)',
+      });
+    }
+  }
+
   #spawnParticles(n) {
     const key = this.layout.keys.get(n.midi);
     if (!key) return;

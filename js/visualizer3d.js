@@ -286,6 +286,16 @@ export class Visualizer3D {
     this.targets = midis?.length ? new Set(midis) : null;
   }
 
+  /** Where a note lands, per deck: piano keys, the strings' plane, or a tone hole. */
+  #impactPoint(midi, k) {
+    if (this.deck === 'strings') {
+      const h = 2.6 + ((108 - midi) / 87) * 6.5; // same law as the string heights
+      return { y: h * 0.55, z: 2.0 };
+    }
+    if (this.deck === 'wind') return { y: 1.6, z: k?.black ? 1.9 : 2.55 };
+    return { y: k?.black ? 1.25 : 0.85, z: 0 };
+  }
+
   /** Float a key-cap label over each mapped piano key (midi -> letter), or null to clear. */
   setKeyLabels(labels) {
     if (!this.labelGroup) {
@@ -309,7 +319,10 @@ export class Visualizer3D {
       const sprite = new THREE.Sprite(
         new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, opacity: mod ? 0.75 : 0.92 })
       );
-      sprite.position.set(k.x + k.w / 2 - 26, k.black ? 1.0 : 0.55, k.black ? 2.6 : 4.7);
+      // chip placement per deck; staggered rows keep neighbours readable
+      if (this.deck === 'strings') sprite.position.set(k.x + k.w / 2 - 26, k.black ? 1.15 : 0.45, 3.2);
+      else if (this.deck === 'wind') sprite.position.set(k.x + k.w / 2 - 26, k.black ? 2.35 : 1.95, k.black ? 1.9 : 2.55);
+      else sprite.position.set(k.x + k.w / 2 - 26, k.black ? 1.0 : 0.55, k.black ? 2.6 : 4.7);
       sprite.scale.set(mod ? 0.86 : 0.62, 0.62, 1);
       sprite.renderOrder = 10;
       this.labelGroup.add(sprite);
@@ -374,15 +387,16 @@ export class Visualizer3D {
     // rewind support (restart) is handled via reset()
 
     for (const [n, mesh] of this.live) {
-      const zFront = -(n.start - t) * SPEED; // 0 at impact, negative while far
+      const zi = n.zImpact ?? 0;
+      const zFront = zi - (n.start - t) * SPEED; // zi at impact, far while negative
       const len = Math.max((n.end - n.start) * SPEED, 0.55);
       const sounding = t >= n.start && t < n.end;
 
-      // while sounding the block keeps sliding under the rail and shrinks
-      const consumed = Math.max(Math.min(zFront, len), 0);
+      // while sounding the block keeps sliding past the impact line and shrinks
+      const consumed = Math.max(Math.min(zFront - zi, len), 0);
       const remain = len - consumed;
       mesh.scale.z = Math.max(remain, 0.001);
-      mesh.position.z = Math.min(zFront, 0) - remain / 2 - 0.1;
+      mesh.position.z = Math.min(zFront, zi) - remain / 2 - 0.1;
       mesh.material = sounding
         ? this.noteMats[n.hand + 'hot']
         : this.noteMats[n.hand];
@@ -407,8 +421,12 @@ export class Visualizer3D {
     }
     mesh.visible = true;
     const black = k?.black;
-    mesh.scale.set(black ? 0.5 : 0.84, black ? 0.42 : 0.5, 1);
-    mesh.position.set((k ? k.x + k.w / 2 : 0) - 26, black ? 1.25 : 0.85, -HORIZON);
+    const { y, z } = this.#impactPoint(n.midi, k);
+    n.zImpact = z;
+    if (this.deck === 'strings') mesh.scale.set(0.34, 0.34, 1);
+    else if (this.deck === 'wind') mesh.scale.set(0.5, 0.4, 1);
+    else mesh.scale.set(black ? 0.5 : 0.84, black ? 0.42 : 0.5, 1);
+    mesh.position.set((k ? k.x + k.w / 2 : 0) - 26, y, -HORIZON);
     n.burst = false;
     return mesh;
   }
@@ -487,10 +505,25 @@ export class Visualizer3D {
   #burst(n) {
     const k = this.layout.keys.get(n.midi);
     if (!k) return;
-    const c = this.handColors[n.hand];
-    const x = k.x + k.w / 2 - 26;
-    const y = k.black ? 1.25 : 0.85;
-    const count = 6 + Math.round(n.vel * 8);
+    const { y } = this.#impactPoint(n.midi, k);
+    this.#spawnSparks(k.x + k.w / 2 - 26, y, this.handColors[n.hand], 6 + Math.round(n.vel * 8), 1);
+  }
+
+  /** A user hit lands: reward it — gold shower for perfect, blue for good. */
+  hitBurst(midi, kind) {
+    const k = this.layout.keys.get(midi);
+    if (!k) return;
+    const { y } = this.#impactPoint(midi, k);
+    const gold = kind === 'perfect';
+    this.#spawnSparks(
+      k.x + k.w / 2 - 26, y,
+      new THREE.Color(gold ? 0xffe28a : 0x8fd8ff),
+      gold ? 26 : 14,
+      gold ? 1.8 : 1.3
+    );
+  }
+
+  #spawnSparks(x, y, c, count, power) {
     const pos = this.pPoints.geometry.attributes.position;
     const col = this.pPoints.geometry.attributes.color;
     for (let i = 0; i < count; i++) {
@@ -501,9 +534,9 @@ export class Visualizer3D {
       col.array[idx * 3] = c.r; col.array[idx * 3 + 1] = c.g; col.array[idx * 3 + 2] = c.b;
       this.pData[idx] = {
         life: 1,
-        vx: (Math.random() - 0.5) * 3.5,
-        vy: 2 + Math.random() * 4.5,
-        vz: Math.random() * 2.5,
+        vx: (Math.random() - 0.5) * 3.5 * power,
+        vy: (2 + Math.random() * 4.5) * power,
+        vz: Math.random() * 2.5 * power,
       };
     }
     pos.needsUpdate = true;

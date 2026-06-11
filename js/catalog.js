@@ -15,12 +15,17 @@ export function loadCatalog() {
     for (const entry of entries) {
       const fs = files[entry.id];
       if (!fs?.length) continue;
+      // the opus (BWV, K., Op.) is what tells four "Menuet"s apart
+      const base =
+        entry.opus && !entry.title.toLowerCase().includes(entry.opus.toLowerCase())
+          ? `${entry.title} · ${entry.opus}`
+          : entry.title;
       fs.forEach((file, i) => {
         items.push({
           entry,
           file,
           movement: fs.length > 1 ? i + 1 : 0,
-          label: entry.title + (fs.length > 1 ? ` · ${roman(i + 1)}` : ''),
+          label: base + (fs.length > 1 ? ` · ${roman(i + 1)}` : ''),
         });
       });
     }

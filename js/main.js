@@ -153,7 +153,11 @@ input.onnoteon = (midi, vel) => {
   if (!synth || paused) return;
   synth.noteOn(midi, vel);
   liveInput.set(midi, { vel });
-  if (judge && seq) showJudgement(judge.noteOn(midi, seq.songTime));
+  if (judge && seq) {
+    const result = judge.noteOn(midi, seq.songTime);
+    showJudgement(result);
+    if (result === 'perfect' || result === 'good') viz.hitBurst(midi, result);
+  }
 };
 input.onnoteoff = (midi) => {
   synth?.noteOff(midi);
@@ -187,12 +191,20 @@ function showJudgement(result) {
   hudJudge.textContent = result === 'extra' ? '·' : result;
   hudJudge.className = result;
   judgeAnim?.cancel();
+  const pop = result === 'perfect' ? 1.7 : 1.3;
   judgeAnim = hudJudge.animate(
-    [{ opacity: 1, transform: 'scale(1.18)' }, { opacity: 1, transform: 'scale(1)', offset: 0.25 }, { opacity: 0 }],
-    { duration: 900, easing: 'ease-out', fill: 'forwards' }
+    [
+      { opacity: 1, transform: `scale(${pop})` },
+      { opacity: 1, transform: 'scale(1)', offset: 0.22 },
+      { opacity: 0, transform: 'scale(0.96)' },
+    ],
+    { duration: 950, easing: 'cubic-bezier(0.2, 0.9, 0.3, 1)', fill: 'forwards' }
   );
   hudScore.textContent = String(Math.round(judge.score));
-  hudCombo.textContent = judge.combo > 1 ? `×${judge.combo}` : '';
+  const combo = judge.combo > 1 ? `×${judge.combo}` : '';
+  if (combo && combo !== hudCombo.textContent)
+    hudCombo.animate([{ transform: 'scale(1.4)' }, { transform: 'scale(1)' }], { duration: 260, easing: 'ease-out' });
+  hudCombo.textContent = combo;
 }
 
 // A playlist is what prev/next/autoplay walk through: the featured nine, or

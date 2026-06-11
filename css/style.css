@@ -317,21 +317,25 @@ html, body {
 #playhud[hidden] { display: none; }
 #playhud {
   position: fixed;
-  left: 1.3rem;
-  top: 34%;
+  left: 50%;
+  top: 20%;
+  transform: translateX(-50%);
   z-index: 5;
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
+  align-items: center;
+  gap: 0.1rem;
+  text-align: center;
   pointer-events: none;
   font-variant-numeric: tabular-nums;
 }
 #hud-judge {
-  min-height: 1.6rem;
-  font-size: 1.25rem;
+  min-height: 2.6rem;
+  font-size: 2.1rem;
   font-style: italic;
   letter-spacing: 0.16em;
 }
+#hud-judge.perfect { text-shadow: 0 0 26px rgba(255, 226, 138, 0.85), 0 0 60px rgba(255, 226, 138, 0.4); }
 #hud-judge.perfect { color: #ffe28a; text-shadow: 0 0 14px rgba(255, 226, 138, 0.6); }
 #hud-judge.good { color: #8fd8ff; text-shadow: 0 0 12px rgba(143, 216, 255, 0.5); }
 #hud-judge.miss, #hud-judge.extra { color: #ff8d9e; }
@@ -353,7 +357,9 @@ html, body {
   letter-spacing: 0.1em;
 }
 #hud-input {
-  margin-top: 0.4rem;
+  position: fixed;
+  left: 1.2rem;
+  top: 3.4rem;
   font-size: 0.8rem;
   font-style: italic;
   letter-spacing: 0.1em;
@@ -440,6 +446,7 @@ body.playing #controls:hover { opacity: 1; }
 }
 
 /* ---- voices / tracks panel ---- */
+#voices-panel[hidden] { display: none; }
 #voices-panel {
   position: fixed;
   top: 3.6rem;
